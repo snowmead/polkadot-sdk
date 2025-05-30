@@ -124,20 +124,20 @@ jobs:
             RELEASE_URL="${{ inputs.release_url }}"
             BRANCH_NAME="${{ steps.release_info.outputs.branch_name }}"
             
-            PR_BODY=$(cat <<EOF
+            cat > pr-body.txt << PREOF
 # Fork Upgrade Analysis
 
-🔄 **Status**: Analysis in progress...
+🔄 Status: Analysis in progress...
 
-**Release URL**: ${RELEASE_URL}
-**Branch**: ${BRANCH_NAME}
-**Started**: $(date)
+Release URL: ${RELEASE_URL}
+Branch: ${BRANCH_NAME}
+Started: $(date)
 
 ---
 
-*This PR will be updated automatically once the analysis is complete.*
-EOF
-)
+This PR will be updated automatically once the analysis is complete.
+PREOF
+            PR_BODY=$(cat pr-body.txt)
             
             PR_URL=$(gh pr create \
               --title "${PR_TITLE}" \
@@ -176,10 +176,13 @@ EOF
           gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "🤖 Fork upgrade analysis started at $(date)"
           
           # Create the full prompt with analyzer instructions
-          cat > analyzer-prompt.txt << 'EOF'
+          RELEASE_URL="${{ inputs.release_url }}"
+          cat > analyzer-prompt.txt << EOF
 # Fork Upgrade Analyzer - Upstream Change Analysis for Forks
 
-**PURPOSE**: Analyzes upstream release changes in $ARGUMENTS and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
+**PURPOSE**: Analyzes upstream release changes and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
+
+**RELEASE URL**: ${RELEASE_URL}
 
 ## Working Directory Setup
 
@@ -193,7 +196,7 @@ EOF
 **FIRST**, analyze the upstream repository:
 
 1. **Gather Upstream Release Information**:
-   - Parse the release URL/tag provided in $ARGUMENTS
+   - Parse the release URL/tag provided above
    - Identify the upstream repository and version
    - Fetch the complete release notes and changelog
    - Extract all PRs, commits, and issues included in the release
