@@ -181,7 +181,9 @@ jobs:
           cat > analyzer-prompt.txt << 'ANALYZEREOF'
           # Fork Upgrade Analyzer - Upstream Change Analysis for Forks
 
-          **PURPOSE**: Analyzes upstream release changes in $ARGUMENTS and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
+          **PURPOSE**: Analyzes upstream release changes and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
+
+          **RELEASE URL**: RELEASE_URL_PLACEHOLDER
 
           ## Working Directory Setup
 
@@ -195,7 +197,7 @@ jobs:
           **FIRST**, analyze the upstream repository:
 
           1. **Gather Upstream Release Information**:
-            - Parse the release URL/tag provided in $ARGUMENTS
+            - Parse the release URL/tag provided above
             - Identify the upstream repository and version
             - Fetch the complete release notes and changelog
             - Extract all PRs, commits, and issues included in the release
@@ -486,7 +488,7 @@ jobs:
           
           # Run the analyzer with timeout and error handling - use -p flag for non-interactive mode
           PROMPT_CONTENT=$(cat analyzer-prompt.txt)
-          timeout 30m claude -p "${PROMPT_CONTENT}" --allowedTools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" || {
+          timeout 30m claude -p "${PROMPT_CONTENT}" --allowed-tools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" --max-turns 10 || {
             EXIT_CODE=$?
             if [ $EXIT_CODE -eq 124 ]; then
               echo "❌ Analysis timed out after 30 minutes"
