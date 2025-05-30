@@ -248,10 +248,9 @@ jobs:
           sed -i.bak "s|RELEASE_URL_PLACEHOLDER|${{ inputs.release_url }}|g" analyzer-prompt.txt
           rm -f analyzer-prompt.txt.bak
           
-          # Run the analyzer with timeout and error handling - use --no-interactive flag
-          export CI=true
+          # Run the analyzer with timeout and error handling - use -p flag for non-interactive mode
           PROMPT_CONTENT=$(cat analyzer-prompt.txt)
-          timeout 30m claude chat --no-interactive --allowedTools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" "${PROMPT_CONTENT}" || {
+          timeout 30m claude -p "${PROMPT_CONTENT}" --allowedTools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" --max-turns 10 || {
             EXIT_CODE=$?
             if [ $EXIT_CODE -eq 124 ]; then
               echo "❌ Analysis timed out after 30 minutes"
