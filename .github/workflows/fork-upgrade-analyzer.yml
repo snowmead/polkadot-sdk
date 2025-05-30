@@ -250,7 +250,7 @@ jobs:
           
           # Run the analyzer with timeout and error handling - use -p flag for non-interactive mode
           PROMPT_CONTENT=$(cat analyzer-prompt.txt)
-          timeout 30m claude -p "${PROMPT_CONTENT}" --allowedTools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" --max-turns 10 || {
+          timeout 30m claude -p "${PROMPT_CONTENT}" --allowedTools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" || {
             EXIT_CODE=$?
             if [ $EXIT_CODE -eq 124 ]; then
               echo "❌ Analysis timed out after 30 minutes"
