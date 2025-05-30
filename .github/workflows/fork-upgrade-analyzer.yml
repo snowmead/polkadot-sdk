@@ -382,12 +382,10 @@ jobs:
             
             Track progress by checking off each change unit as it's addressed:
             
-            [For each bug fix change unit:]
-            - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
-              - Related: [#num](link), [#num](link)
-              - Component: `[component name]`
-              - Impact: [Low/Medium/High]
-              - Flags: [🔴 BREAKING if it's a breaking change] [🛡️ SECURITY if it's a security fix]
+            | ✓ | Primary Item | Title | Related Items | Impact | Flags | Analysis |
+            |---|--------------|-------|---------------|--------|-------|----------|
+            [For each change unit:]
+            | ☐ | [#primary-item](upstream-link) | [Title] | [#num](link), [#num](link) | [Low/Medium/High] | [🔴 BREAKING] [🛡️ SECURITY] | [📄 Details](./change-unit-xxx/analysis.md) |
             
             ## 🔗 Quick Links
             
