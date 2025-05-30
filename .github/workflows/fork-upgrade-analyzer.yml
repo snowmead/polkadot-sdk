@@ -357,6 +357,7 @@ jobs:
             - Add `None` if no special flags apply
             - Only show flags that actually apply (don't show placeholder text)
 
+            MUST FOLLOW THIS PR DESCRIPTION TEMPLATE (DO NOT ADD OR CHANGE ANY SECTIONS OF THIS TEMPLATE):
             ```markdown
             # 🚀 Fork Upgrade to [Repository] [Version]
             
@@ -395,34 +396,6 @@ jobs:
             - **Our Fork**: [link]
             ```
 
-          ## Key Improvements
-
-          1. **Full Parallelization**: Every change unit gets its own agent running simultaneously
-          2. **Smart Deduplication**: Related PRs and issues are grouped into logical change units to avoid duplicate analysis
-          3. **Better Formatting**:
-            - Use of emojis for visual clarity
-            - Tables for organized data presentation
-            - Hyperlinks throughout the document
-            - Clear section separators
-            - Consistent heading hierarchy
-          4. **Enhanced Navigation**:
-            - Direct links to detailed analyses
-            - Cross-references between sections
-            - File and line number links in format `[file:line](url)`
-          5. **Structured Analysis**:
-            - Each change unit has consistent analysis format
-            - Clear categorization and prioritization
-            - Migration checklist for easy tracking
-
-          ## Implementation Notes
-
-          - **Change Unit Approach**: Related PRs and issues are grouped together and analyzed as logical units
-          - **Maximum Parallelization**: All agents spawn in one operation
-          - **Clean Separation**: Each agent works in isolation with no shared state
-          - **No Duplication**: Each PR/issue appears in exactly one change unit
-          - **Consistent Output**: All analyses follow the same template
-          - **Rich Formatting**: Markdown features used extensively for readability
-          
           ## IMPORTANT OUTPUT REQUIREMENTS:
           1. You MUST create the analysis directory using the exact name provided in ANALYSIS DIRECTORY above
           2. You MUST create the file `fork-upgrade-guide.md` in that directory
