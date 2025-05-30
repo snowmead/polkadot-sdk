@@ -180,66 +180,302 @@ jobs:
           # Create the analyzer prompt file
           cat > analyzer-prompt.txt << 'ANALYZEREOF'
           # Fork Upgrade Analyzer - Upstream Change Analysis for Forks
-          
-          **PURPOSE**: Analyzes upstream release changes and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
-          
-          **RELEASE URL**: RELEASE_URL_PLACEHOLDER
-          
+
+          **PURPOSE**: Analyzes upstream release changes in $ARGUMENTS and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
+
           ## Working Directory Setup
-          
+
           1. **Create Main Analysis Directory**: `<repo>-<version>-fork-analysis` (e.g., `react-v18.3.0-fork-analysis`)
           2. **Create PR/Issue Subdirectories**: Individual directories for each PR/issue will be created during analysis
-          
+
           ## Analysis Process
-          
+
           ### Phase 1: Upstream Repository Analysis
-          
+
           **FIRST**, analyze the upstream repository:
-          
+
           1. **Gather Upstream Release Information**:
-             - Parse the release URL/tag provided above
-             - Identify the upstream repository and version
-             - Fetch the complete release notes and changelog
-             - Extract all PRs, commits, and issues included in the release
-          
+            - Parse the release URL/tag provided in $ARGUMENTS
+            - Identify the upstream repository and version
+            - Fetch the complete release notes and changelog
+            - Extract all PRs, commits, and issues included in the release
+
           2. **Use TodoWrite** to track:
-             - Each PR/issue discovered in the release
-             - Analysis completion status for each item
-             - Final report generation
-          
+            - Each PR/issue discovered in the release
+            - Analysis completion status for each item
+            - Final report generation
+
           ### Phase 2: Parallel Change Unit Analysis
-          
+
           1. **Identify Change Units**:
-             - Parse the release notes to find all PR numbers and issue numbers
-             - Group related items into logical change units
-             - Ensure each PR appears in exactly one change unit to avoid duplication
-             - Each change unit should represent one logical change or improvement to the codebase
-          
+            - Parse the release notes to find all PR numbers and issue numbers
+            - Group related items into logical change units:
+              - When an issue is mentioned alongside one or more PRs that address it, group them together as a single change unit
+              - When multiple PRs work together to solve the same issue, group them all with that issue
+              - When a standalone PR is mentioned without an associated issue, treat it as its own change unit
+              - When a standalone issue is mentioned without associated PRs, treat it as its own change unit
+            - Ensure each PR appears in exactly one change unit to avoid duplication
+            - Each change unit should represent one logical change or improvement to the codebase
+
           2. **Generate Change Unit Analysis Agents**:
-             Spawn a dedicated sub-agent for EACH change unit identified.
-             **CRITICAL**: You MUST spawn all sub-agents in parallel in a single message for maximum efficiency.
-          
+            Spawn a dedicated sub-agent for EACH change unit identified.
+            **CRITICAL**: You MUST spawn all sub-agents in parallel in a single message for maximum efficiency.
+
           3. **Sub-Agent Instructions**:
-             Each sub-agent receives a focused task to analyze ONE logical change unit.
-             
-             Create directory structure:
-             - <main-dir>/change-unit-<identifier>/analysis.md
-             - <main-dir>/fork-upgrade-guide.md
-          
+            Each sub-agent receives a focused task to analyze ONE logical change unit, which may contain multiple related PRs and issues.
+            
+            Create directory structure:
+            ```
+            <main-dir>/
+            ├── change-unit-<identifier>/
+            │   └── analysis.md
+            └── fork-upgrade-guide.md
+            ```
+            
+            Where `<identifier>` is:
+            - `pr-<number>` for standalone PRs
+            - `issue-<number>` for standalone issues  
+            - `issue-<number>-prs` for an issue with related PRs
+            - `pr-<number>-group` for multiple related PRs without a main issue
+
           4. **Sub-Agent Context Template**:
-             For each change unit, create a specific analysis task with all the details from the template.
-          
+            For each change unit, create a specific analysis task:
+            
+            ```
+            Analyze the following change unit from [repository] for the [version] release:
+            
+            **Primary Item**: [PR/Issue #number: Title]
+            **URL**: [full URL]
+            
+            **Related Items** (if any):
+            - [PR/Issue #number: Title - URL]
+            - [PR/Issue #number: Title - URL]
+            
+            Your task:
+            1. Fetch content for all items in this change unit using the provided URLs
+            2. Analyze how these items work together to implement a single logical change
+            3. Create a unified analysis report in your working directory
+            4. Use proper markdown formatting with:
+                - Clear headings and subheadings
+                - Hyperlinks to relevant files/lines (format: [filename:line](url))
+                - Code blocks with syntax highlighting
+                - Bullet points for lists
+                - Tables where appropriate
+            
+            The analysis report should include:
+            
+            # Change Unit: [Primary Item Title]
+            
+            ## Overview
+            - **Type**: [Bug Fix | Feature | Enhancement | Breaking Change | Performance | Security]
+            - **Component**: [Affected component/module]
+            - **Severity**: [Critical | High | Medium | Low]
+            - **Primary Item**: [PR/Issue #number with hyperlink]
+            - **Related Items**: [List of related PR/Issue numbers with hyperlinks, or "None"]
+            
+            ## Summary
+            [2-3 sentence executive summary of the complete change unit and how the items work together]
+            
+            ## Items in This Change Unit
+            
+            ### [Primary Item #number]: [Title]
+            **URL**: [hyperlink]
+            **Role**: [Primary implementation | Issue description | etc.]
+            
+            ### [Related Item #number]: [Title] (if any)
+            **URL**: [hyperlink]  
+            **Role**: [Supporting fix | Additional implementation | etc.]
+            
+            ## Technical Details
+            
+            ### Changes Made
+            - [List key files modified across all items with hyperlinks]
+            - [Describe overall implementation approach]
+            - [Explain how multiple items coordinate if applicable]
+            
+            ### Code Examples
+            ```language
+            // Before
+            [relevant code snippet]
+            
+            // After  
+            [relevant code snippet]
+            ```
+            
+            ## Impact Analysis
+            
+            ### Breaking Changes
+            [List any breaking changes or "None"]
+            
+            ### Migration Requirements
+            [Detailed migration steps or "No migration required"]
+            
+            ### Dependencies
+            [List any new dependencies or version changes]
+            
+            ## Testing Considerations
+            [Describe what should be tested]
+            
+            ## Risks and Benefits
+            
+            ### Benefits
+            - [List benefits]
+            
+            ### Risks
+            - [List potential risks]
+            
+            ## Recommendations
+            [Specific recommendations for fork maintainers]
+            ```
+
           5. **Parallel Execution**:
-             Spawn all sub-agents simultaneously. Each agent works on exactly ONE change unit independently.
-          
+            ```
+            Spawn all sub-agents simultaneously:
+            - Each agent works on exactly ONE change unit (which may contain multiple related PRs/issues)
+            - Agents create their reports independently
+            - No coordination needed between agents
+            - No duplication of work since each PR/issue appears in exactly one change unit
+            ```
+
           ### Phase 3: Generate Fork Upgrade Guide for PR Description
-          
+
           1. **Collect All Change Unit Reports**:
-             - Read all analysis.md files from change unit subdirectories
-             - Sort by primary item number for consistent ordering
-          
+            - Read all `analysis.md` files from change unit subdirectories
+            - Sort by primary item number for consistent ordering
+
           2. **Create PR-Ready Upgrade Guide**:
-             Create fork-upgrade-guide.md optimized for use as a PR description following the provided template.
+            Create `fork-upgrade-guide.md` optimized for use as a PR description:
+
+            ```markdown
+            # 🚀 Fork Upgrade to [Repository] [Version]
+            
+            ## 📋 Overview
+            
+            This PR tracks the upgrade of our fork to **[repository name] [version]**. Each change unit from the upstream release has been analyzed and documented below.
+            
+            | Metric | Value |
+            |--------|-------|
+            | **Upstream Repository** | [repository name with link] |
+            | **Target Version** | [version] |
+            | **Analysis Date** | [date] |
+            | **Total Change Units** | [number] |
+            | **Breaking Changes** | [count] |
+            | **Security Fixes** | [count] |
+            
+            ## 🎯 Release Summary
+            
+            [2-3 sentence high-level summary of what this release includes]
+            
+            ## ⚠️ Critical Items
+            
+            ### 🔴 Breaking Changes
+            [List each breaking change with checkbox and link to analysis]
+            - [ ] **[Component]**: [Brief description] → [📄 Details](./change-unit-xxx/analysis.md)
+            
+            ### 🛡️ Security Fixes
+            [List each security fix with checkbox and link to analysis]
+            - [ ] **[Severity]**: [Brief description] → [📄 Details](./change-unit-xxx/analysis.md)
+            
+            ## ✅ Implementation Checklist
+            
+            Track progress by checking off each change unit as it's addressed:
+            
+            ### 🐛 Bug Fixes
+            [For each bug fix change unit:]
+            - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+              - Related: [#num](link), [#num](link)
+              - Component: `[component name]`
+              - Impact: [Low/Medium/High]
+            
+            ### ✨ New Features  
+            [For each feature change unit:]
+            - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+              - Related: [#num](link), [#num](link)
+              - Component: `[component name]`
+              - Impact: [Low/Medium/High]
+            
+            ### 🚀 Performance Improvements
+            [For each performance change unit:]
+            - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+              - Related: [#num](link), [#num](link)
+              - Component: `[component name]`
+              - Impact: [Low/Medium/High]
+            
+            ### 🔧 Enhancements
+            [For each enhancement change unit:]
+            - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+              - Related: [#num](link), [#num](link)
+              - Component: `[component name]`
+              - Impact: [Low/Medium/High]
+            
+            ### 📚 Documentation & Other
+            [For each other change unit:]
+            - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+              - Related: [#num](link), [#num](link)
+              - Component: `[component name]`
+              - Impact: [Low/Medium/High]
+            
+            ## 📊 Implementation Progress
+            
+            - [ ] All breaking changes addressed
+            - [ ] All security fixes applied
+            - [ ] All bug fixes reviewed and applied
+            - [ ] All new features integrated
+            - [ ] All performance improvements evaluated
+            - [ ] Fork-specific customizations preserved
+            - [ ] Test suite passing
+            - [ ] Documentation updated
+            
+            ## 🔗 Quick Links
+            
+            - **Upstream Release**: [link]
+            - **Full Changelog**: [link]
+            - **Our Fork**: [link]
+            
+            ## 📝 Notes for Reviewers
+            
+            Each change unit has been analyzed in detail. Click the 📄 Analysis links above to see:
+            - Technical implementation details
+            - Migration requirements
+            - Potential risks and benefits
+            - Fork-specific recommendations
+            
+            ---
+            
+            **How to use this PR:**
+            1. Review each change unit analysis by clicking the provided links
+            2. Check off items as they are implemented
+            3. Add comments to track any fork-specific modifications needed
+            4. Use this PR as the central tracking point for the upgrade
+            ```
+
+          ## Key Improvements
+
+          1. **Full Parallelization**: Every change unit gets its own agent running simultaneously
+          2. **Smart Deduplication**: Related PRs and issues are grouped into logical change units to avoid duplicate analysis
+          3. **Better Formatting**:
+            - Use of emojis for visual clarity
+            - Tables for organized data presentation
+            - Hyperlinks throughout the document
+            - Clear section separators
+            - Consistent heading hierarchy
+          4. **Enhanced Navigation**:
+            - Direct links to detailed analyses
+            - Cross-references between sections
+            - File and line number links in format `[file:line](url)`
+          5. **Structured Analysis**:
+            - Each change unit has consistent analysis format
+            - Clear categorization and prioritization
+            - Migration checklist for easy tracking
+
+          ## Implementation Notes
+
+          - **Change Unit Approach**: Related PRs and issues are grouped together and analyzed as logical units
+          - **Maximum Parallelization**: All agents spawn in one operation
+          - **Clean Separation**: Each agent works in isolation with no shared state
+          - **No Duplication**: Each PR/issue appears in exactly one change unit
+          - **Consistent Output**: All analyses follow the same template
+          - **Rich Formatting**: Markdown features used extensively for readability
           
           Please begin the analysis now.
           ANALYZEREOF
