@@ -184,10 +184,11 @@ jobs:
           **PURPOSE**: Analyzes upstream release changes and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
 
           **RELEASE URL**: RELEASE_URL_PLACEHOLDER
+          **ANALYSIS DIRECTORY**: ANALYSIS_DIR_PLACEHOLDER
 
           ## Working Directory Setup
 
-          1. **Create Main Analysis Directory**: `<repo>-<version>-fork-analysis` (e.g., `react-v18.3.0-fork-analysis`)
+          1. **Create Main Analysis Directory**: Use the exact directory name provided above in ANALYSIS DIRECTORY
           2. **Create PR/Issue Subdirectories**: Individual directories for each PR/issue will be created during analysis
 
           ## Analysis Process
@@ -226,9 +227,9 @@ jobs:
           3. **Sub-Agent Instructions**:
             Each sub-agent receives a focused task to analyze ONE logical change unit, which may contain multiple related PRs and issues.
             
-            Create directory structure:
+            Create directory structure (use the exact ANALYSIS DIRECTORY name provided above):
             ```
-            <main-dir>/
+            ANALYSIS_DIR_PLACEHOLDER/
             ├── change-unit-<identifier>/
             │   └── analysis.md
             └── fork-upgrade-guide.md
@@ -346,7 +347,7 @@ jobs:
             - Sort by primary item number for consistent ordering
 
           2. **Create PR-Ready Upgrade Guide**:
-            Create `fork-upgrade-guide.md` optimized for use as a PR description:
+            **CRITICAL**: You MUST create the file `fork-upgrade-guide.md` in the ANALYSIS DIRECTORY provided above. This file is required for the workflow to succeed.
 
             ```markdown
             # 🚀 Fork Upgrade to [Repository] [Version]
@@ -479,11 +480,17 @@ jobs:
           - **Consistent Output**: All analyses follow the same template
           - **Rich Formatting**: Markdown features used extensively for readability
           
+          ## IMPORTANT OUTPUT REQUIREMENTS:
+          1. You MUST create the analysis directory using the exact name provided in ANALYSIS DIRECTORY above
+          2. You MUST create the file `fork-upgrade-guide.md` in that directory
+          3. The workflow will fail if these files are not created in the expected locations
+          
           Please begin the analysis now.
           ANALYZEREOF
           
-          # Replace placeholder with actual URL
+          # Replace placeholders with actual values
           sed -i.bak "s|RELEASE_URL_PLACEHOLDER|${{ inputs.release_url }}|g" analyzer-prompt.txt
+          sed -i.bak "s|ANALYSIS_DIR_PLACEHOLDER|${{ steps.release_info.outputs.analysis_dir }}|g" analyzer-prompt.txt
           rm -f analyzer-prompt.txt.bak
           
           # Run the analyzer with timeout and error handling - use -p flag for non-interactive mode
