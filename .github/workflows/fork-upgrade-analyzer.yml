@@ -120,7 +120,8 @@ jobs:
               DRAFT_FLAG="--draft"
             fi
             
-            PR_BODY="# Fork Upgrade Analysis
+            PR_BODY=$(cat <<EOF
+# Fork Upgrade Analysis
 
 🔄 **Status**: Analysis in progress...
 
@@ -130,7 +131,9 @@ jobs:
 
 ---
 
-*This PR will be updated automatically once the analysis is complete.*"
+*This PR will be updated automatically once the analysis is complete.*
+EOF
+)
             
             PR_URL=$(gh pr create \
               --title "${PR_TITLE}" \
