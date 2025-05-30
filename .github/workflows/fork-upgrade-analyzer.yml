@@ -120,13 +120,17 @@ jobs:
               DRAFT_FLAG="--draft"
             fi
             
+            # Export variables for use in heredoc
+            RELEASE_URL="${{ inputs.release_url }}"
+            BRANCH_NAME="${{ steps.release_info.outputs.branch_name }}"
+            
             PR_BODY=$(cat <<EOF
 # Fork Upgrade Analysis
 
 🔄 **Status**: Analysis in progress...
 
-**Release URL**: ${{ inputs.release_url }}
-**Branch**: ${{ steps.release_info.outputs.branch_name }}
+**Release URL**: ${RELEASE_URL}
+**Branch**: ${BRANCH_NAME}
 **Started**: $(date)
 
 ---
