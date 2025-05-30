@@ -79,7 +79,7 @@ jobs:
       - name: Install Claude Code CLI
         run: |
           npm install -g @anthropic-ai/claude-code
-          claude-code --version
+          claude --version
           
       - name: Run Fork Upgrade Analyzer
         if: steps.check_existing.outputs.exists == 'false'
@@ -89,7 +89,7 @@ jobs:
           echo "🔍 Starting fork upgrade analysis..."
           
           # Run the analyzer with timeout and error handling
-          timeout 30m claude-code run project:fork_upgrade_analyzer "${{ inputs.release_url }}" || {
+          timeout 30m claude run project:fork_upgrade_analyzer "${{ inputs.release_url }}" || {
             EXIT_CODE=$?
             if [ $EXIT_CODE -eq 124 ]; then
               echo "❌ Analysis timed out after 20 minutes"
