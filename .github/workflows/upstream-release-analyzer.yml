@@ -1,0 +1,239 @@
+name: Fork Upgrade Analyzer
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_url:
+        description: 'Upstream release URL (e.g., https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2503-2)'
+        required: true
+        type: string
+      target_branch:
+        description: 'Target branch for the PR'
+        required: false
+        default: 'main'
+        type: string
+      pr_draft:
+        description: 'Create PR as draft'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  analyze-and-create-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          
+      - name: Extract release information
+        id: release_info
+        run: |
+          # Extract version and repo info from URL
+          if [[ ! "${{ inputs.release_url }}" =~ ^https://github.com/[^/]+/[^/]+/releases/tag/.+ ]]; then
+            echo "Error: Invalid release URL format"
+            exit 1
+          fi
+          
+          VERSION=$(echo "${{ inputs.release_url }}" | sed -n 's/.*\/tag\/\(.*\)$/\1/p')
+          REPO_PATH=$(echo "${{ inputs.release_url }}" | sed -n 's|https://github.com/\([^/]*/[^/]*\)/.*|\1|p')
+          REPO_NAME=$(echo "${REPO_PATH}" | tr '/' '-')
+          ANALYSIS_DIR="${REPO_NAME}-${VERSION}-fork-analysis"
+          BRANCH_NAME="fork-upgrade/${VERSION}"
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "repo_path=${REPO_PATH}" >> $GITHUB_OUTPUT
+          echo "analysis_dir=${ANALYSIS_DIR}" >> $GITHUB_OUTPUT
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          
+          # Log for debugging
+          echo "📋 Release Information:"
+          echo "  Version: ${VERSION}"
+          echo "  Repository: ${REPO_PATH}"
+          echo "  Analysis Directory: ${ANALYSIS_DIR}"
+          echo "  Branch Name: ${BRANCH_NAME}"
+          
+      - name: Check if analysis already exists
+        id: check_existing
+        run: |
+          if [ -d "${{ steps.release_info.outputs.analysis_dir }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Analysis directory already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude-code --version
+          
+      - name: Run Fork Upgrade Analyzer
+        if: steps.check_existing.outputs.exists == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "🔍 Starting fork upgrade analysis..."
+          
+          # Run the analyzer with timeout and error handling
+          timeout 30m claude-code run project:fork_upgrade_analyzer "${{ inputs.release_url }}" || {
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 124 ]; then
+              echo "❌ Analysis timed out after 20 minutes"
+              exit 1
+            else
+              echo "❌ Analysis failed with exit code: $EXIT_CODE"
+              exit $EXIT_CODE
+            fi
+          }
+          
+          # Verify the analysis was created
+          if [ ! -d "${{ steps.release_info.outputs.analysis_dir }}" ]; then
+            echo "❌ Analysis directory was not created"
+            exit 1
+          fi
+          
+          if [ ! -f "${{ steps.release_info.outputs.analysis_dir }}/fork-upgrade-guide.md" ]; then
+            echo "❌ Fork upgrade guide was not generated"
+            exit 1
+          fi
+          
+          echo "✅ Analysis completed successfully"
+          
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+      - name: Create and push branch
+        id: create_branch
+        run: |
+          # Check if branch already exists
+          if git ls-remote --heads origin "${{ steps.release_info.outputs.branch_name }}" | grep -q "${{ steps.release_info.outputs.branch_name }}"; then
+            echo "⚠️ Branch already exists, checking out existing branch"
+            git fetch origin "${{ steps.release_info.outputs.branch_name }}"
+            git checkout "${{ steps.release_info.outputs.branch_name }}"
+            BRANCH_EXISTS="true"
+          else
+            echo "📝 Creating new branch"
+            git checkout -b "${{ steps.release_info.outputs.branch_name }}"
+            BRANCH_EXISTS="false"
+          fi
+          
+          echo "branch_exists=${BRANCH_EXISTS}" >> $GITHUB_OUTPUT
+          
+          # Add the analysis files
+          git add "${{ steps.release_info.outputs.analysis_dir }}"
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "📋 No changes to commit"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "💾 Committing changes"
+            git commit -m "Add fork upgrade analysis for ${{ steps.release_info.outputs.version }}
+            
+            Automated analysis of upstream release:
+            ${{ inputs.release_url }}
+            
+            Generated by Fork Upgrade Analyzer workflow"
+            
+            git push -u origin "${{ steps.release_info.outputs.branch_name }}"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Create or update PR
+        if: steps.create_branch.outputs.has_changes == 'true' || steps.create_branch.outputs.branch_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_TITLE="🚀 Fork Upgrade to ${{ steps.release_info.outputs.version }}"
+          PR_BODY_FILE="${{ steps.release_info.outputs.analysis_dir }}/fork-upgrade-guide.md"
+          
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --base "${{ inputs.target_branch }}" --head "${{ steps.release_info.outputs.branch_name }}" --json number --jq '.[0].number' || echo "")
+          
+          if [ -n "$EXISTING_PR" ]; then
+            echo "📝 Updating existing PR #${EXISTING_PR}"
+            gh pr edit "${EXISTING_PR}" --body-file "${PR_BODY_FILE}"
+            echo "PR_URL=https://github.com/${{ github.repository }}/pull/${EXISTING_PR}" >> $GITHUB_ENV
+          else
+            echo "🆕 Creating new PR"
+            DRAFT_FLAG=""
+            if [ "${{ inputs.pr_draft }}" = "true" ]; then
+              DRAFT_FLAG="--draft"
+            fi
+            
+            PR_URL=$(gh pr create \
+              --title "${PR_TITLE}" \
+              --body-file "${PR_BODY_FILE}" \
+              --base "${{ inputs.target_branch }}" \
+              --head "${{ steps.release_info.outputs.branch_name }}" \
+              --label "fork-upgrade" \
+              --label "automated" \
+              --label "${{ steps.release_info.outputs.version }}" \
+              ${DRAFT_FLAG})
+              
+            echo "PR_URL=${PR_URL}" >> $GITHUB_ENV
+          fi
+          
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "# Fork Upgrade Analysis Summary 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status**: Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Details" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release URL** | ${{ inputs.release_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ steps.release_info.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Repository** | ${{ steps.release_info.outputs.repo_path }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Branch** | ${{ inputs.target_branch }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Analysis Directory** | \`${{ steps.release_info.outputs.analysis_dir }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch Name** | \`${{ steps.release_info.outputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "${PR_URL}" ]; then
+            echo "| **Pull Request** | [View PR](${PR_URL}) |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add analysis files if they exist
+          if [ -d "${{ steps.release_info.outputs.analysis_dir }}" ]; then
+            echo "## Generated Files" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            find "${{ steps.release_info.outputs.analysis_dir }}" -type f -name "*.md" | sort
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      - name: Post failure comment
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Only post if this was triggered from an issue
+          if [ -n "${{ github.event.issue.number }}" ]; then
+            gh issue comment ${{ github.event.issue.number }} --body "❌ Fork upgrade analysis failed. Please check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          fi
