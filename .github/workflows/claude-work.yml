@@ -1,0 +1,88 @@
+name: Claude Code Assistant
+
+# This workflow automatically triggers when @claude is mentioned in comments
+# Claude will automatically receive:
+# - The full PR description
+# - The comment that triggered it
+# - All comments in the PR/issue thread
+# - The diff of changes (for PRs)
+# - Access to the repository structure
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened]
+
+jobs:
+  claude-response:
+    # Only run if comment contains @claude
+    if: contains(github.event.comment.body, '@claude') || contains(github.event.review.body, '@claude') || (github.event_name == 'issues' && contains(github.event.issue.body, '@claude'))
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for better context
+          fetch-depth: 0
+          
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@beta
+        with:
+          # Required: Anthropic API key stored in repository secrets
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          
+          # GitHub token for API access (automatically provided)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Customize the trigger phrase (default is @claude)
+          trigger_phrase: "@claude"
+          
+          # Allow all necessary tools for PR management and code changes
+          allowed_tools: "Task,Bash,Glob,Grep,LS,Read,Edit,MultiEdit,Write,NotebookRead,NotebookEdit,TodoRead,TodoWrite,mcp__github_file_ops__commit_files,mcp__github_file_ops__delete_files,mcp__github__add_issue_comment,mcp__github__add_pull_request_review_comment,mcp__github__create_branch,mcp__github__create_issue,mcp__github__create_or_update_file,mcp__github__create_pull_request,mcp__github__create_pull_request_review,mcp__github__create_repository,mcp__github__delete_file,mcp__github__fork_repository,mcp__github__get_code_scanning_alert,mcp__github__get_commit,mcp__github__get_file_contents,mcp__github__get_issue,mcp__github__get_issue_comments,mcp__github__get_me,mcp__github__get_pull_request,mcp__github__get_pull_request_comments,mcp__github__get_pull_request_files,mcp__github__get_pull_request_reviews,mcp__github__get_pull_request_status,mcp__github__get_secret_scanning_alert,mcp__github__get_tag,mcp__github__list_branches,mcp__github__list_code_scanning_alerts,mcp__github__list_commits,mcp__github__list_issues,mcp__github__list_pull_requests,mcp__github__list_secret_scanning_alerts,mcp__github__list_tags,mcp__github__merge_pull_request,mcp__github__push_files,mcp__github__search_code,mcp__github__search_issues,mcp__github__search_repositories,mcp__github__search_users,mcp__github__update_issue,mcp__github__update_issue_comment,mcp__github__update_pull_request,mcp__github__update_pull_request_branch,mcp__github__update_pull_request_comment"
+          
+          # Custom instructions for handling change units and PR workflows
+          custom_instructions: |
+            Your role is to analyze and implement change units from PR descriptions. When triggered:
+            
+            1. **Read and understand the request**: Parse the comment that triggered you and understand what needs to be done.
+            
+            2. **Analyze PR description**: Use mcp__github__get_pull_request to read the full PR description and identify all change units that need implementation.
+            
+            3. **For each change unit that needs work**:
+               - Create a new branch based on the current PR branch using mcp__github__create_branch
+               - Switch to the new branch
+               - Implement the required changes using the code editing tools
+               - Commit the changes using mcp__github_file_ops__commit_files
+               - Push the branch and create a new PR using mcp__github__create_pull_request which targets the original PR
+               - Update the original PR description using mcp__github__update_pull_request to reference the newly created branch and PR
+            
+            4. **Update tracking**: After creating sub-PRs, always update the main PR description to include references to all created branches and PRs for each change unit.
+            
+            5. **Best practices**:
+               - Always create descriptive branch names that reflect the change unit
+               - Write clear commit messages
+               - Create PRs with detailed descriptions linking back to the parent PR
+               - Keep the main PR description updated with the status of all change units
+          
+          # Set maximum number of turns for complex operations
+          # max_turns: 25
+          
+          # Set timeout in minutes (default: 30)
+          timeout_minutes: 30
+          
+          # Enable GitHub MCP server
+          install_github_mcp: true
+          
+          # Optional: Specify a different model
+          # model: "claude-3-5-sonnet-latest"
