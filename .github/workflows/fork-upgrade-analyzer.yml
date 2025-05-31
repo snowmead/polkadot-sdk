@@ -31,6 +31,8 @@ jobs:
   analyze-and-create-pr:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Only allow @snowmead to run this workflow
+    if: github.actor == 'snowmead'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
