@@ -20,8 +20,13 @@ on:
 
 jobs:
   claude-response:
-    # Only run if comment contains @claude
-    if: contains(github.event.comment.body, '@claude') || contains(github.event.review.body, '@claude') || (github.event_name == 'issues' && contains(github.event.issue.body, '@claude'))
+    # Only run if comment contains @claude and is from @snowmead
+    if: |
+      github.actor == 'snowmead' && (
+        contains(github.event.comment.body, '@claude') || 
+        contains(github.event.review.body, '@claude') || 
+        (github.event_name == 'issues' && contains(github.event.issue.body, '@claude'))
+      )
     runs-on: ubuntu-latest
     
     permissions:
