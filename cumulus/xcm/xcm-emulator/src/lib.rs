@@ -1299,22 +1299,22 @@ macro_rules! assert_expected_events {
 				}
 			}
 
-			if event_received && !meet_conditions  {
-				message.push(
-					format!(
-						"\n\n{}::\x1b[31m{}\x1b[0m was received but some of its attributes did not meet the conditions:\n{}",
-						stringify!($chain),
-						stringify!($event_pat),
-						event_message.concat()
-					)
-				);
-			} else if !event_received {
+			if !event_received {
 				message.push(
 					format!(
 						"\n\n{}::\x1b[31m{}\x1b[0m was never received. All events:\n{:#?}",
 						stringify!($chain),
 						stringify!($event_pat),
 						<$chain as $crate::Chain>::events(),
+					)
+				);
+			} else if event_received && !meet_conditions  {
+				message.push(
+					format!(
+						"\n\n{}::\x1b[31m{}\x1b[0m was received but some of its attributes did not meet the conditions:\n{}",
+						stringify!($chain),
+						stringify!($event_pat),
+						event_message.concat()
 					)
 				);
 			} else {
