@@ -45,69 +45,42 @@ jobs:
 
           # Custom instructions for handling change units and PR workflows
           custom_instructions: |
-            <role>
-            You are a GitHub workflow assistant that creates sub-branches and PRs for change units. You MUST create a sub-branch and sub-PR for EACH change unit.
-            </role>
+            Your role is to analyze and implement change units from PR descriptions. When triggered:
 
-            <workflow>
-            <step1>
-            Store the EXACT trigger comment text (needed for sub-PRs)
-            </step1>
+            1. **Read and understand the request**: Parse the comment that triggered you and understand what needs to be done. Store the original trigger comment for later use.
 
-            <step2>
-            Read PR description and identify ALL change units needing implementation
-            </step2>
+            2. **Analyze PR description**: Read the full PR description and identify all change units that need implementation.
 
-            <step3>
-            For EACH change unit:
+            3. **For each change unit that needs work**:
+               - Create a new branch based on the current PR branch with a descriptive name
+               - Switch to the new branch
+               - Generate a detailed analysis of the change unit including:
+                 * What needs to be changed
+                 * Files that will be affected
+                 * Implementation approach
+                 * Potential risks or considerations
+               - Create a new PR with:
+                 * Target: the original PR's branch
+                 * Title: Clear description of the change unit
+                 * Description: Include the detailed analysis and a task checklist based on the user's request (e.g., cherry-pick specific changes, implement features, fix bugs)
+               - Immediately after creating the PR, add a comment with:
+                 * The exact copy of the original comment that triggered Claude
+                 * Append: "\n\n---\n\n**Task:** Complete the task list in the PR description above."
+               - Update the original PR description to:
+                 * Fix any incorrect analysis file links
+                 * Add proper references to the newly created branch and PR with correct links
 
-            <create_branch>
-            - Create branch from CURRENT PR branch (NOT main)
-            - Name: "feature/[change-unit-description]"
-            - Switch to new branch
-            </create_branch>
+            4. **Update tracking**: After creating sub-PRs, always update the main PR description to include:
+               - Correct links to all created branches and PRs for each change unit
+               - Status tracking for each change unit
+               - Ensure all file links in the analysis section are properly formatted
 
-            <analyze>
-            Generate analysis with:
-            - Overview of changes needed
-            - List of affected files
-            - Implementation approach
-            - Key considerations/risks
-            </analyze>
-
-            <create_pr>
-            Create PR with:
-            - Target: Parent PR branch (NOT main)
-            - Title: "Change Unit: [description]"
-            - Body: Analysis + task checklist + parent PR reference
-            </create_pr>
-
-            <add_comment>
-            Add comment to new PR:
-            ```
-            [Original trigger comment]
-
-            ---
-
-            **Task:** Complete the task list in the PR description above.
-            ```
-            </add_comment>
-
-            <update_parent>
-            Update parent PR description with:
-            - Links to new branch and PR
-            - Fixed file links
-            - Status tracking
-            </update_parent>
-            </step3>
-            </workflow>
-
-            <critical_rules>
-            - ALWAYS create sub-branches from parent PR branch
-            - NEVER target main/master with sub-PRs
-            - MUST preserve exact trigger comment in each sub-PR
-            - STOP and report if branch/PR creation fails
-            </critical_rules>
+            5. **Best practices**:
+               - Always create descriptive branch names that reflect the change unit
+               - Write clear commit messages
+               - Create PRs with detailed descriptions and actionable checklists
+               - Keep the main PR description updated with correct links and status
+               - Preserve the original trigger context in sub-PRs for clarity
 
           # Set maximum number of turns for complex operations
           # max_turns: 25
