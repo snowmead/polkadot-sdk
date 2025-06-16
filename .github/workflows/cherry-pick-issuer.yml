@@ -60,28 +60,30 @@ jobs:
 
           # Create the issue creation prompt file
           cat > cherry-pick-prompt.txt << 'CHERRYEOF'
-          You're a release engineer managing cherry picks for the Polkadot SDK fork upgrade. Create a GitHub issue that tracks cherry pick management tasks.
+          You're a release engineer managing cherry picks for the Polkadot SDK fork upgrade. Create a master GitHub issue and individual sub-issues for each cherry pick.
 
-          This repository requires systematic tracking of cherry picks during version upgrades. The development team values organized task lists and clear status indicators.
+          This repository requires systematic tracking of cherry picks during version upgrades. The development team values organized hierarchical issue tracking with detailed individual cherry pick information.
 
           Use this data for your analysis:<data>CSV_DATA_PLACEHOLDER</data>
 
           <instructions>
           1. Parse CSV with format: Applied,Commit,Cherry pick,Status,Upstream PR,Note
-          2. Create issue with title: ISSUE_TITLE_PLACEHOLDER
-          3. Add "fork-upgrade" label using GitHub CLI
-          4. Group items by status with actionable checkboxes
-          5. Include metrics table with counts by status
-          6. Use status handling rules for each category
+          2. Create master issue with title: ISSUE_TITLE_PLACEHOLDER
+          3. Add "fork-upgrade" and "master-issue" labels to master issue
+          4. For each cherry pick row, create a sub-issue with detailed information
+          5. Add "fork-upgrade" and "cherry-pick" labels to each sub-issue
+          6. Link sub-issues to master issue in both directions
+          7. Include summary metrics in master issue
           </instructions>
 
           Make your tone professional and actionable. Follow this structure:
           <formatting_example>
+          MASTER ISSUE:
           # Cherry Pick Management for RELEASE_VERSION_PLACEHOLDER
 
           ## Overview
 
-          This issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
+          This master issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
 
           | Metric | Value |
           |--------|-------|
@@ -101,25 +103,44 @@ jobs:
           - **Needs PR Upstream**: Manual process - submit to upstream
           - **Temporary**: Review for potential removal
 
-          ## Action Items
+          ## Sub-Issues by Status
 
           ### Permanent Cherry Picks
-          [Create checkbox list for each permanent item]
+          - [ ] Cherry pick: [commit] - #[issue-number]
 
           ### Upstream PR Not Merged
-          [Create checkbox list for each item]
+          - [ ] Cherry pick: [commit] - #[issue-number]
 
           ### Needs PR Upstream
-          [Create checkbox list for each item]
+          - [ ] Cherry pick: [commit] - #[issue-number]
 
           ### Temporary Cherry Picks
-          [Create checkbox list for each item]
+          - [ ] Cherry pick: [commit] - #[issue-number]
 
           ### PR Upstream Merged (Skip)
-          [Create crossed-out list for each item]
+          - [x] ~~Cherry pick: [commit] - #[issue-number]~~
+
+          SUB-ISSUE TEMPLATE (create one for each CSV row):
+          # Cherry Pick: [commit-short] - [cherry-pick-description]
+
+          ## Details
+          - **Commit**: [full-commit-hash]
+          - **Cherry Pick**: [cherry-pick-description]
+          - **Status**: [status]
+          - **Upstream PR**: [upstream-pr-link-if-exists]
+          - **Applied**: [yes/no]
+
+          ## Notes
+          [note-from-csv]
+
+          ## Action Required
+          [Based on status, include specific action needed]
+
+          ## Master Issue
+          Related to #[master-issue-number]
           </formatting_example>
 
-          Create the GitHub issue now with repository: ${{ github.repository }}
+          Create the master GitHub issue and all sub-issues now with repository: ${{ github.repository }}
           CHERRYEOF
 
           # Replace placeholders with actual values using printf to handle special characters
