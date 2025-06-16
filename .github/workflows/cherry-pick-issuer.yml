@@ -60,87 +60,77 @@ jobs:
 
           # Create the issue creation prompt file
           cat > cherry-pick-prompt.txt << 'CHERRYEOF'
-          You're a release engineer managing cherry picks for the Polkadot SDK fork upgrade. Create a master GitHub issue and individual sub-issues for each cherry pick.
+          You're a release engineer managing cherry picks for the Polkadot SDK fork upgrade. Create a technical tracking issue for cherry pick management.
 
-          This repository requires systematic tracking of cherry picks during version upgrades. The development team values organized hierarchical issue tracking with detailed individual cherry pick information.
+          This repository requires precise tracking of cherry picks during version upgrades. The development team requires clear technical documentation and actionable tasks.
 
           Use this data for your analysis:<data>CSV_DATA_PLACEHOLDER</data>
 
           <instructions>
           1. Parse CSV with format: Applied,Commit,Cherry pick,Status,Upstream PR,Note
-          2. Create master issue with title: ISSUE_TITLE_PLACEHOLDER
-          3. Add "fork-upgrade" and "master-issue" labels to master issue
-          4. For each cherry pick row, create a sub-issue with detailed information
-          5. Add "fork-upgrade" and "cherry-pick" labels to each sub-issue
-          6. Link sub-issues to master issue in both directions
-          7. Include summary metrics in master issue
+          2. Create issue with title: ISSUE_TITLE_PLACEHOLDER
+          3. Add "fork-upgrade" label using GitHub CLI
+          4. Group items by status with commit hashes visible
+          5. Include concise metrics summary
+          6. Format for developer readability with technical details
           </instructions>
 
-          Make your tone professional and actionable. Follow this structure:
+          Use technical, concise language. Follow this structure:
           <formatting_example>
-          MASTER ISSUE:
-          # Cherry Pick Management for RELEASE_VERSION_PLACEHOLDER
+          # ISSUE_TITLE_PLACEHOLDER - RELEASE_VERSION_PLACEHOLDER
 
-          ## Overview
+          ## Summary
 
-          This master issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
+          Fork upgrade to `RELEASE_VERSION_PLACEHOLDER` - cherry pick tracking.
 
-          | Metric | Value |
-          |--------|-------|
-          | Total Cherry Picks | [count] |
+          | Status | Count |
+          |--------|------:|
           | Permanent | [count] |
-          | Upstream PR Merged | [count] |
+          | PR Upstream Merged | [count] |
           | Upstream PR Not Merged | [count] |
           | Needs PR Upstream | [count] |
           | Temporary | [count] |
-          | Analysis Date | [date] |
+          | **Total** | **[total]** |
 
-          ## Status Handling Rules
+          Generated: [ISO-8601 timestamp]
 
-          - **Permanent**: Find and apply if needed
+          ## Status Definitions
+
+          - **Permanent**: Apply during fork upgrade
           - **PR Upstream Merged**: Skip - already in next version
           - **Upstream PR Not Merged**: Re-apply after checking PR status
-          - **Needs PR Upstream**: Manual process - submit to upstream
+          - **Needs PR Upstream**: Submit to upstream first
           - **Temporary**: Review for potential removal
 
-          ## Sub-Issues by Status
+          ## Required Actions
 
-          ### Permanent Cherry Picks
-          - [ ] Cherry pick: [commit] - #[issue-number]
-
+          ### Permanent
+          Apply during fork upgrade.
+          - [ ] `[commit-hash-short]` - [description] ([upstream-pr-if-exists])
+          
           ### Upstream PR Not Merged
-          - [ ] Cherry pick: [commit] - #[issue-number]
-
+          Check PR status before applying.
+          - [ ] `[commit-hash-short]` - [description] ([upstream-pr-link])
+          
           ### Needs PR Upstream
-          - [ ] Cherry pick: [commit] - #[issue-number]
-
-          ### Temporary Cherry Picks
-          - [ ] Cherry pick: [commit] - #[issue-number]
-
-          ### PR Upstream Merged (Skip)
-          - [x] ~~Cherry pick: [commit] - #[issue-number]~~
-
-          SUB-ISSUE TEMPLATE (create one for each CSV row):
-          # Cherry Pick: [commit-short] - [cherry-pick-description]
-
-          ## Details
-          - **Commit**: [full-commit-hash]
-          - **Cherry Pick**: [cherry-pick-description]
-          - **Status**: [status]
-          - **Upstream PR**: [upstream-pr-link-if-exists]
-          - **Applied**: [yes/no]
+          Submit to upstream before next upgrade.
+          - [ ] `[commit-hash-short]` - [description]
+          
+          ### Temporary
+          Review for removal.
+          - [ ] `[commit-hash-short]` - [description]
+          
+          ### Already Merged Upstream
+          Skip - included in release.
+          - `[commit-hash-short]` - ~~[description]~~ ([upstream-pr-link])
 
           ## Notes
-          [note-from-csv]
 
-          ## Action Required
-          [Based on status, include specific action needed]
-
-          ## Master Issue
-          Related to #[master-issue-number]
+          [Include any critical notes from CSV in a bullet list]
+          - `[commit]`: [note]
           </formatting_example>
 
-          Create the master GitHub issue and all sub-issues now with repository: ${{ github.repository }}
+          Create the GitHub issue now with repository: ${{ github.repository }}
           CHERRYEOF
 
           # Replace placeholders with actual values using printf to handle special characters
