@@ -11,6 +11,10 @@ on:
         description: "Release version (e.g., polkadot-stable2412)"
         required: true
         type: string
+      upstream_branch:
+        description: "Upstream branch name (e.g., stable2412)"
+        required: true
+        type: string
       issue_title:
         description: "Title for the GitHub issue"
         required: false
@@ -67,13 +71,17 @@ jobs:
           Use this data for your analysis:<data>CSV_DATA_PLACEHOLDER</data>
 
           <instructions>
-          1. Parse CSV with format: Applied,Commit,Cherry pick,Status,Upstream PR,Note
-          2. Create issue with title: ISSUE_TITLE_PLACEHOLDER
-          3. Add "fork-upgrade" label using GitHub CLI
-          4. Group items by status with commit hashes visible
-          5. Include concise metrics summary
-          6. Format for developer readability with technical details
-          7. Format all links using markdown syntax: [text](url)
+          1. Set up upstream branch:
+             - git remote add upstream git@github.com:paritytech/polkadot-sdk.git
+             - git fetch upstream
+             - git checkout -b moonbeam-RELEASE_VERSION_PLACEHOLDER-rc1 upstream/UPSTREAM_BRANCH_PLACEHOLDER
+          2. Parse CSV with format: Applied,Commit,Cherry pick,Status,Upstream PR,Note
+          3. Create issue with title: ISSUE_TITLE_PLACEHOLDER
+          4. Add "fork-upgrade" label using GitHub CLI
+          5. Group items by status with commit hashes visible
+          6. Include concise metrics summary
+          7. Format for developer readability with technical details
+          8. Format all links using markdown syntax: [text](url)
           </instructions>
 
           Use technical, concise language. Follow this structure:
@@ -83,6 +91,9 @@ jobs:
           ## Summary
 
           Fork upgrade to `RELEASE_VERSION_PLACEHOLDER` - cherry pick tracking.
+
+          **Working Branch**: `moonbeam-RELEASE_VERSION_PLACEHOLDER-rc1`  
+          **Upstream Branch**: `upstream/UPSTREAM_BRANCH_PLACEHOLDER`
 
           | Status | Count |
           |--------|------:|
@@ -143,6 +154,7 @@ jobs:
           # Replace placeholders with actual values using printf to handle special characters
           CSV_DATA=$(printf '%s\n' "${{ inputs.csv_data }}")
           RELEASE_VERSION="${{ inputs.release_version }}"
+          UPSTREAM_BRANCH="${{ inputs.upstream_branch }}"
           ISSUE_TITLE="${{ inputs.issue_title }}"
 
           # Use a more robust method to replace placeholders
@@ -167,6 +179,7 @@ jobs:
 
           # Replace other placeholders safely
           sed -i.bak "s|RELEASE_VERSION_PLACEHOLDER|${RELEASE_VERSION}|g" cherry-pick-prompt.txt
+          sed -i.bak "s|UPSTREAM_BRANCH_PLACEHOLDER|${UPSTREAM_BRANCH}|g" cherry-pick-prompt.txt
           sed -i.bak "s|ISSUE_TITLE_PLACEHOLDER|${ISSUE_TITLE}|g" cherry-pick-prompt.txt
           rm -f cherry-pick-prompt.txt.bak temp-replacements.txt
 
