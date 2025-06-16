@@ -1,6 +1,21 @@
 name: Cherry Pick Analyzer
 
 on:
+  workflow_dispatch:
+    inputs:
+      csv_data:
+        description: "CSV formatted cherry pick data"
+        required: true
+        type: string
+      release_version:
+        description: "Release version (e.g., polkadot-stable2412)"
+        required: true
+        type: string
+      issue_title:
+        description: "Title for the GitHub issue"
+        required: false
+        default: "Cherry Pick Management"
+        type: string
   issue_comment:
     types: [created]
   issues:
@@ -8,8 +23,9 @@ on:
 
 jobs:
   cherry-pick-analyzer:
-    # Only run if comment contains @cherry-pick-analyzer and is from @snowmead
+    # Run if manually dispatched by @snowmead OR comment contains @cherry-pick-analyzer from @snowmead
     if: |
+      (github.event_name == 'workflow_dispatch' && github.actor == 'snowmead') ||
       (github.event.comment.body && contains(github.event.comment.body, '@cherry-pick-analyzer') && github.event.comment.user.login == 'snowmead') ||
       (github.event.action == 'opened' && contains(github.event.issue.body, '@cherry-pick-analyzer') && github.event.issue.user.login == 'snowmead')
     runs-on: ubuntu-latest
@@ -42,9 +58,13 @@ jobs:
 
           # Custom instructions for handling cherry pick analysis
           custom_instructions: |
-            Analyze CSV cherry pick data and create GitHub issues with organized subtasks. When triggered with @cherry-pick-analyzer:
+            Analyze CSV cherry pick data and create GitHub issues with organized subtasks.
 
-            1. Parse CSV data from comment/issue body. Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
+            **Data Source**: 
+            - Manual dispatch: Use workflow inputs (csv_data: "${{ inputs.csv_data }}", release_version: "${{ inputs.release_version }}", issue_title: "${{ inputs.issue_title }}")
+            - Comment trigger: Parse CSV data from comment/issue body
+
+            1. Parse CSV data. Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
 
             2. Status meanings:
                - Permanent: Find and apply if needed
