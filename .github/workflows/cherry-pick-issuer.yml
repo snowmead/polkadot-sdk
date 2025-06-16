@@ -41,110 +41,139 @@ jobs:
           # Fetch full history for better context
           fetch-depth: 0
 
-      - name: Run Claude Code Action
-        uses: anthropics/claude-code-action@beta
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          # Required: Anthropic API key stored in repository secrets
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          node-version: "20"
 
-          # GitHub token for API access (automatically provided)
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude --version
 
-          # Customize the trigger phrase
-          trigger_phrase: "@cherry-pick-analyzer"
+      - name: Run Cherry Pick Analyzer
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Starting cherry pick analysis..."
 
-          # Allow all necessary tools for issue management and analysis
-          allowed_tools: "Task,Bash,Glob,Grep,LS,Read,Edit,MultiEdit,Write,NotebookRead,NotebookEdit,TodoRead,TodoWrite"
+          # Create the analyzer prompt file
+          cat > cherry-pick-prompt.txt << 'CHERRYEOF'
+          Analyze CSV cherry pick data and create GitHub issues with organized subtasks.
 
-          # Custom instructions for handling cherry pick analysis
-          custom_instructions: |
-            Analyze CSV cherry pick data and create GitHub issues with organized subtasks.
+          **CSV DATA**: CSV_DATA_PLACEHOLDER
+          **RELEASE VERSION**: RELEASE_VERSION_PLACEHOLDER
+          **ISSUE TITLE**: ISSUE_TITLE_PLACEHOLDER
+          **GITHUB REPOSITORY**: ${{ github.repository }}
 
-            **Data Source**: 
-            - Manual dispatch: Use workflow inputs (csv_data: "${{ inputs.csv_data }}", release_version: "${{ inputs.release_version }}", issue_title: "${{ inputs.issue_title }}")
-            - Comment trigger: Parse CSV data from comment/issue body
+          1. Parse CSV data. Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
 
-            1. Parse CSV data. Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
+          2. Status meanings:
+             - Permanent: Find and apply if needed
+             - PR Upstream Merged: Skip - already in next version
+             - Upstream PR not merged: Re-apply after checking PR status
+             - Needs PR upstream: Manual process required
+             - Temporary: Review for potential removal
 
-            2. Status meanings:
-               - Permanent: Find and apply if needed
-               - PR Upstream Merged: Skip - already in next version
-               - Upstream PR not merged: Re-apply after checking PR status
-               - Needs PR upstream: Manual process required
-               - Temporary: Review for potential removal
+          3. Create GitHub issue with this structure:
+             ```markdown
+             # Cherry Pick Management for RELEASE_VERSION_PLACEHOLDER
 
-            3. Create GitHub issue with this structure:
-               ```markdown
-               # Cherry Pick Management for Fork Upgrade
+             ## Overview
+             This issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
 
-               ## Overview
-               This issue tracks cherry pick management during fork upgrade.
+             | Metric | Value |
+             |--------|-------|
+             | Total Cherry Picks | [count] |
+             | Permanent | [count] |
+             | Upstream PR Merged | [count] - Skip |
+             | Upstream PR Not Merged | [count] - Re-apply |
+             | Needs PR Upstream | [count] - Manual |
+             | Temporary | [count] - Review |
+             | Analysis Date | [current date] |
 
-               | Metric | Value |
-               |--------|-------|
-               | Total Cherry Picks | [count] |
-               | Permanent | [count] |
-               | Upstream PR Merged | [count] - Skip |
-               | Upstream PR Not Merged | [count] - Re-apply |
-               | Needs PR Upstream | [count] - Manual |
-               | Temporary | [count] - Review |
-               | Analysis Date | [current date] |
+             ## Status Handling Rules
+             - **Permanent**: Find and apply if needed
+             - **PR Upstream Merged**: Skip - already in next version
+             - **Upstream PR Not Merged**: Re-apply after checking PR status
+             - **Needs PR Upstream**: Manual process - submit to upstream
+             - **Temporary**: Review for potential removal
 
-               ## Status Handling Rules
-               - **Permanent**: Find and always apply
-               - **PR Upstream Merged**: Skip - already in next version
-               - **Upstream PR Not Merged**: Re-apply after checking PR status
-               - **Needs PR Upstream**: Find and apply
-               - **Temporary**: Review for potential removal
+             ## Action Items
 
-               ## Action Items
+             ### Permanent Cherry Picks
+             [For each permanent:]
+             - [ ] **[commit_hash](commit-link)**: [description]
+               - Status: Permanent
+               - Upstream PR: [pr_link if available]
+               - Note: [note if available]
+               - Action: Find and apply if needed
 
-               ### Permanent Cherry Picks
-               [For each permanent:]
-               - [ ] **[commit_hash](commit-link)**: [description]
-                 - Status: Permanent
-                 - Upstream PR: [pr_link if available]
-                 - Note: [note if available]
-                 - Action: Find and apply if needed
+             ### Upstream PR Not Merged
+             [For each upstream PR not merged:]
+             - [ ] **[commit_hash](commit-link)**: [description]
+               - Status: Upstream PR not merged
+               - Upstream PR: [pr_link]
+               - Note: [note if available]
+               - Action: Check PR status, re-apply if not merged
 
-               ### Upstream PR Not Merged
-               [For each upstream PR not merged:]
-               - [ ] **[commit_hash](commit-link)**: [description]
-                 - Status: Upstream PR not merged
-                 - Upstream PR: [pr_link]
-                 - Note: [note if available]
-                 - Action: Check PR status, re-apply if not merged
+             ### Needs PR Upstream
+             [For each needs PR upstream:]
+             - [ ] **[commit_hash](commit-link)**: [description]
+               - Status: Needs PR upstream
+               - Upstream PR: [pr_link if available]
+               - Note: [note if available]
+               - Action: Submit PR to upstream
 
-               ### Needs PR Upstream
-               [For each needs PR upstream:]
-               - [ ] **[commit_hash](commit-link)**: [description]
-                 - Status: Needs PR upstream
-                 - Upstream PR: [pr_link if available]
-                 - Note: [note if available]
-                 - Action: Submit PR to upstream
+             ### Temporary Cherry Picks
+             [For each temporary:]
+             - [ ] **[commit_hash](commit-link)**: [description]
+               - Status: Temporary
+               - Upstream PR: [pr_link if available]
+               - Note: [note if available]
+               - Action: Review if still needed
 
-               ### Temporary Cherry Picks
-               [For each temporary:]
-               - [ ] **[commit_hash](commit-link)**: [description]
-                 - Status: Temporary
-                 - Upstream PR: [pr_link if available]
-                 - Note: [note if available]
-                 - Action: Review if still needed
+             ### PR Upstream Merged (Skip)
+             [For each PR upstream merged:]
+             - [x] ~~**[commit_hash](commit-link)**: [description]~~ Already in next version
+               - Status: PR Upstream Merged
+               - Upstream PR: [pr_link]
+               - Action: Skip
 
-               ### PR Upstream Merged (Skip)
-               [For each PR upstream merged:]
-               - [x] ~~**[commit_hash](commit-link)**: [description]~~ Already in next version
-                 - Status: PR Upstream Merged
-                 - Upstream PR: [pr_link]
-                 - Action: Skip
+             ## Notes
+             [Include special notes from CSV]
+             ```
 
-               ## Notes
-               [Include special notes from CSV]
-               ```
+          4. Create working links to commits and PRs. Extract commit hashes from URLs when needed.
 
-            4. Create working links to commits and PRs. Extract commit hashes from URLs when needed.
+          5. Use TodoWrite to track progress.
 
-            5. Use TodoWrite to track progress.
+          6. Use GitHub CLI to create the issue with labels: "cherry-pick", "fork-upgrade", "tracking"
 
-          # Set timeout in minutes
-          timeout_minutes: 15
+          Begin analysis now.
+          CHERRYEOF
+
+          # Replace placeholders with actual values
+          sed -i.bak "s|CSV_DATA_PLACEHOLDER|${{ inputs.csv_data }}|g" cherry-pick-prompt.txt
+          sed -i.bak "s|RELEASE_VERSION_PLACEHOLDER|${{ inputs.release_version }}|g" cherry-pick-prompt.txt
+          sed -i.bak "s|ISSUE_TITLE_PLACEHOLDER|${{ inputs.issue_title }}|g" cherry-pick-prompt.txt
+          rm -f cherry-pick-prompt.txt.bak
+
+          # Run the analyzer with timeout and error handling
+          PROMPT_CONTENT=$(cat cherry-pick-prompt.txt)
+          timeout 10m claude -p "${PROMPT_CONTENT}" --allowedTools "Task,Bash,Glob,Grep,LS,Read,Edit,MultiEdit,Write,NotebookRead,NotebookEdit,TodoRead,TodoWrite" || {
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 124 ]; then
+              echo "Analysis timed out after 10 minutes"
+              exit 1
+            else
+              echo "Analysis failed with exit code: $EXIT_CODE"
+              exit $EXIT_CODE
+            fi
+          }
+
+          echo "Cherry pick analysis completed successfully"
+
+          # Clean up
+          rm -f cherry-pick-prompt.txt
