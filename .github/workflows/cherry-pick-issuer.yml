@@ -60,44 +60,41 @@ jobs:
 
           # Create the issue creation prompt file
           cat > cherry-pick-prompt.txt << 'CHERRYEOF'
-          Create a GitHub issue for cherry pick management using the provided CSV data.
+          You're a release engineer managing cherry picks for the Polkadot SDK fork upgrade. Create a GitHub issue that tracks cherry pick management tasks.
 
-          **CSV DATA**: CSV_DATA_PLACEHOLDER
-          **RELEASE VERSION**: RELEASE_VERSION_PLACEHOLDER
-          **ISSUE TITLE**: ISSUE_TITLE_PLACEHOLDER
-          **GITHUB REPOSITORY**: ${{ github.repository }}
+          This repository requires systematic tracking of cherry picks during version upgrades. The development team values organized task lists and clear status indicators.
 
-          Task: Parse the CSV data and create a GitHub issue with organized subtasks.
+          Use this data for your analysis:<data>CSV_DATA_PLACEHOLDER</data>
 
-          CSV Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
+          <instructions>
+          1. Parse CSV with format: Applied,Commit,Cherry pick,Status,Upstream PR,Note
+          2. Create issue with title: ISSUE_TITLE_PLACEHOLDER
+          3. Add "fork-upgrade" label using GitHub CLI
+          4. Group items by status with actionable checkboxes
+          5. Include metrics table with counts by status
+          6. Use status handling rules for each category
+          </instructions>
 
-          Status meanings:
-          - Permanent: Find and apply if needed
-          - PR Upstream Merged: Skip - already in next version
-          - Upstream PR not merged: Re-apply after checking PR status
-          - Needs PR upstream: Manual process required
-          - Temporary: Review for potential removal
-
-          Use GitHub CLI to create an issue with this content structure and add labels: "cherry-pick", "fork-upgrade", "tracking"
-
-          Issue template:
-          ```markdown
+          Make your tone professional and actionable. Follow this structure:
+          <formatting_example>
           # Cherry Pick Management for RELEASE_VERSION_PLACEHOLDER
 
           ## Overview
+
           This issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
 
           | Metric | Value |
           |--------|-------|
-          | Total Cherry Picks | [count from CSV] |
+          | Total Cherry Picks | [count] |
           | Permanent | [count] |
-          | Upstream PR Merged | [count] - Skip |
-          | Upstream PR Not Merged | [count] - Re-apply |
-          | Needs PR Upstream | [count] - Manual |
-          | Temporary | [count] - Review |
-          | Analysis Date | [current date] |
+          | Upstream PR Merged | [count] |
+          | Upstream PR Not Merged | [count] |
+          | Needs PR Upstream | [count] |
+          | Temporary | [count] |
+          | Analysis Date | [date] |
 
           ## Status Handling Rules
+
           - **Permanent**: Find and apply if needed
           - **PR Upstream Merged**: Skip - already in next version
           - **Upstream PR Not Merged**: Re-apply after checking PR status
@@ -107,25 +104,22 @@ jobs:
           ## Action Items
 
           ### Permanent Cherry Picks
-          [List each permanent cherry pick with checkbox, commit link, PR link, and note]
+          [Create checkbox list for each permanent item]
 
           ### Upstream PR Not Merged
-          [List each with checkbox, commit link, PR link, and note]
+          [Create checkbox list for each item]
 
           ### Needs PR Upstream
-          [List each with checkbox, commit link, PR link, and note]
+          [Create checkbox list for each item]
 
           ### Temporary Cherry Picks
-          [List each with checkbox, commit link, PR link, and note]
+          [Create checkbox list for each item]
 
           ### PR Upstream Merged (Skip)
-          [List each as completed/crossed out]
+          [Create crossed-out list for each item]
+          </formatting_example>
 
-          ## Notes
-          [Include any special notes from CSV data]
-          ```
-
-          Create the issue now.
+          Create the GitHub issue now with repository: ${{ github.repository }}
           CHERRYEOF
 
           # Replace placeholders with actual values using printf to handle special characters
