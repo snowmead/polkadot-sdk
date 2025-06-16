@@ -106,28 +106,34 @@ jobs:
 
           ### Permanent
           Apply during fork upgrade.
-          - [ ] `[commit-hash-short]` - [description] ([upstream-pr-if-exists])
-          
+          - [ ] **[cherry-pick-description]**
+            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - Note: [note-if-exists]
+
           ### Upstream PR Not Merged
           Check PR status before applying.
-          - [ ] `[commit-hash-short]` - [description] ([upstream-pr-link])
-          
+          - [ ] **[cherry-pick-description]**
+            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - PR: [upstream-pr-link]
+            - Note: [note-if-exists]
+
           ### Needs PR Upstream
           Submit to upstream before next upgrade.
-          - [ ] `[commit-hash-short]` - [description]
-          
+          - [ ] **[cherry-pick-description]**
+            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - Note: [note-if-exists]
+
           ### Temporary
           Review for removal.
-          - [ ] `[commit-hash-short]` - [description]
-          
-          ### Already Merged Upstream
+          - [ ] **[cherry-pick-description]**
+            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - Note: [note-if-exists]
+
+          ### PR Upstream Merged
           Skip - included in release.
-          - `[commit-hash-short]` - ~~[description]~~ ([upstream-pr-link])
-
-          ## Notes
-
-          [Include any critical notes from CSV in a bullet list]
-          - `[commit]`: [note]
+          - ~~**[cherry-pick-description]**~~
+            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - PR: [upstream-pr-link] ✓
           </formatting_example>
 
           Create the GitHub issue now with repository: ${{ github.repository }}
