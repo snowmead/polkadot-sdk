@@ -71,10 +71,10 @@ jobs:
                | Analysis Date | [current date] |
 
                ## Status Handling Rules
-               - **Permanent**: Find and apply if needed
+               - **Permanent**: Find and always apply
                - **PR Upstream Merged**: Skip - already in next version
                - **Upstream PR Not Merged**: Re-apply after checking PR status
-               - **Needs PR Upstream**: Manual process - submit to upstream
+               - **Needs PR Upstream**: Find and apply
                - **Temporary**: Review for potential removal
 
                ## Action Items
