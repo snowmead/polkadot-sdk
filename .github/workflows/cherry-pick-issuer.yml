@@ -1,0 +1,130 @@
+name: Cherry Pick Analyzer
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+jobs:
+  cherry-pick-analyzer:
+    # Only run if comment contains @cherry-pick-analyzer and is from @snowmead
+    if: |
+      (github.event.comment.body && contains(github.event.comment.body, '@cherry-pick-analyzer') && github.event.comment.user.login == 'snowmead') ||
+      (github.event.action == 'opened' && contains(github.event.issue.body, '@cherry-pick-analyzer') && github.event.issue.user.login == 'snowmead')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for better context
+          fetch-depth: 0
+
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@beta
+        with:
+          # Required: Anthropic API key stored in repository secrets
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # GitHub token for API access (automatically provided)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Customize the trigger phrase
+          trigger_phrase: "@cherry-pick-analyzer"
+
+          # Allow all necessary tools for issue management and analysis
+          allowed_tools: "Task,Bash,Glob,Grep,LS,Read,Edit,MultiEdit,Write,NotebookRead,NotebookEdit,TodoRead,TodoWrite"
+
+          # Custom instructions for handling cherry pick analysis
+          custom_instructions: |
+            Analyze CSV cherry pick data and create GitHub issues with organized subtasks. When triggered with @cherry-pick-analyzer:
+
+            1. Parse CSV data from comment/issue body. Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
+
+            2. Status meanings:
+               - Permanent: Find and apply if needed
+               - PR Upstream Merged: Skip - already in next version
+               - Upstream PR not merged: Re-apply after checking PR status
+               - Needs PR upstream: Manual process required
+               - Temporary: Review for potential removal
+
+            3. Create GitHub issue with this structure:
+               ```markdown
+               # Cherry Pick Management for Fork Upgrade
+
+               ## Overview
+               This issue tracks cherry pick management during fork upgrade.
+
+               | Metric | Value |
+               |--------|-------|
+               | Total Cherry Picks | [count] |
+               | Permanent | [count] |
+               | Upstream PR Merged | [count] - Skip |
+               | Upstream PR Not Merged | [count] - Re-apply |
+               | Needs PR Upstream | [count] - Manual |
+               | Temporary | [count] - Review |
+               | Analysis Date | [current date] |
+
+               ## Status Handling Rules
+               - **Permanent**: Find and apply if needed
+               - **PR Upstream Merged**: Skip - already in next version
+               - **Upstream PR Not Merged**: Re-apply after checking PR status
+               - **Needs PR Upstream**: Manual process - submit to upstream
+               - **Temporary**: Review for potential removal
+
+               ## Action Items
+
+               ### Permanent Cherry Picks
+               [For each permanent:]
+               - [ ] **[commit_hash](commit-link)**: [description]
+                 - Status: Permanent
+                 - Upstream PR: [pr_link if available]
+                 - Note: [note if available]
+                 - Action: Find and apply if needed
+
+               ### Upstream PR Not Merged
+               [For each upstream PR not merged:]
+               - [ ] **[commit_hash](commit-link)**: [description]
+                 - Status: Upstream PR not merged
+                 - Upstream PR: [pr_link]
+                 - Note: [note if available]
+                 - Action: Check PR status, re-apply if not merged
+
+               ### Needs PR Upstream
+               [For each needs PR upstream:]
+               - [ ] **[commit_hash](commit-link)**: [description]
+                 - Status: Needs PR upstream
+                 - Upstream PR: [pr_link if available]
+                 - Note: [note if available]
+                 - Action: Submit PR to upstream
+
+               ### Temporary Cherry Picks
+               [For each temporary:]
+               - [ ] **[commit_hash](commit-link)**: [description]
+                 - Status: Temporary
+                 - Upstream PR: [pr_link if available]
+                 - Note: [note if available]
+                 - Action: Review if still needed
+
+               ### PR Upstream Merged (Skip)
+               [For each PR upstream merged:]
+               - [x] ~~**[commit_hash](commit-link)**: [description]~~ Already in next version
+                 - Status: PR Upstream Merged
+                 - Upstream PR: [pr_link]
+                 - Action: Skip
+
+               ## Notes
+               [Include special notes from CSV]
+               ```
+
+            4. Create working links to commits and PRs. Extract commit hashes from URLs when needed.
+
+            5. Use TodoWrite to track progress.
+
+          # Set timeout in minutes
+          timeout_minutes: 15
