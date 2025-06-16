@@ -73,6 +73,7 @@ jobs:
           4. Group items by status with commit hashes visible
           5. Include concise metrics summary
           6. Format for developer readability with technical details
+          7. Format all links using markdown syntax: [text](url)
           </instructions>
 
           Use technical, concise language. Follow this structure:
@@ -107,33 +108,33 @@ jobs:
           ### Permanent
           Apply during fork upgrade.
           - [ ] **[cherry-pick-description]**
-            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - Commit: [`[commit-hash-short]`]([full-commit-url])
             - Note: [note-if-exists]
 
           ### Upstream PR Not Merged
           Check PR status before applying.
           - [ ] **[cherry-pick-description]**
-            - Commit: `[commit-hash-short]` ([full-commit-link])
-            - PR: [upstream-pr-link]
+            - Commit: [`[commit-hash-short]`]([full-commit-url])
+            - PR: [#[pr-number]]([upstream-pr-url])
             - Note: [note-if-exists]
 
           ### Needs PR Upstream
           Submit to upstream before next upgrade.
           - [ ] **[cherry-pick-description]**
-            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - Commit: [`[commit-hash-short]`]([full-commit-url])
             - Note: [note-if-exists]
 
           ### Temporary
           Review for removal.
           - [ ] **[cherry-pick-description]**
-            - Commit: `[commit-hash-short]` ([full-commit-link])
+            - Commit: [`[commit-hash-short]`]([full-commit-url])
             - Note: [note-if-exists]
 
           ### PR Upstream Merged
           Skip - included in release.
           - ~~**[cherry-pick-description]**~~
-            - Commit: `[commit-hash-short]` ([full-commit-link])
-            - PR: [upstream-pr-link] ✓
+            - Commit: [`[commit-hash-short]`]([full-commit-url])
+            - PR: [#[pr-number]]([upstream-pr-url]) ✓
           </formatting_example>
 
           Create the GitHub issue now with repository: ${{ github.repository }}
