@@ -58,107 +58,105 @@ jobs:
         run: |
           echo "Starting cherry pick analysis..."
 
-          # Create the analyzer prompt file
+          # Create the issue creation prompt file
           cat > cherry-pick-prompt.txt << 'CHERRYEOF'
-          Analyze CSV cherry pick data and create GitHub issues with organized subtasks.
+          Create a GitHub issue for cherry pick management using the provided CSV data.
 
           **CSV DATA**: CSV_DATA_PLACEHOLDER
           **RELEASE VERSION**: RELEASE_VERSION_PLACEHOLDER
           **ISSUE TITLE**: ISSUE_TITLE_PLACEHOLDER
           **GITHUB REPOSITORY**: ${{ github.repository }}
 
-          1. Parse CSV data. Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
+          Task: Parse the CSV data and create a GitHub issue with organized subtasks.
 
-          2. Status meanings:
-             - Permanent: Find and apply if needed
-             - PR Upstream Merged: Skip - already in next version
-             - Upstream PR not merged: Re-apply after checking PR status
-             - Needs PR upstream: Manual process required
-             - Temporary: Review for potential removal
+          CSV Format: `Applied,Commit,Cherry pick,Status,Upstream PR,Note`
 
-          3. Create GitHub issue with this structure:
-             ```markdown
-             # Cherry Pick Management for RELEASE_VERSION_PLACEHOLDER
+          Status meanings:
+          - Permanent: Find and apply if needed
+          - PR Upstream Merged: Skip - already in next version
+          - Upstream PR not merged: Re-apply after checking PR status
+          - Needs PR upstream: Manual process required
+          - Temporary: Review for potential removal
 
-             ## Overview
-             This issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
+          Use GitHub CLI to create an issue with this content structure and add labels: "cherry-pick", "fork-upgrade", "tracking"
 
-             | Metric | Value |
-             |--------|-------|
-             | Total Cherry Picks | [count] |
-             | Permanent | [count] |
-             | Upstream PR Merged | [count] - Skip |
-             | Upstream PR Not Merged | [count] - Re-apply |
-             | Needs PR Upstream | [count] - Manual |
-             | Temporary | [count] - Review |
-             | Analysis Date | [current date] |
+          Issue template:
+          ```markdown
+          # Cherry Pick Management for RELEASE_VERSION_PLACEHOLDER
 
-             ## Status Handling Rules
-             - **Permanent**: Find and apply if needed
-             - **PR Upstream Merged**: Skip - already in next version
-             - **Upstream PR Not Merged**: Re-apply after checking PR status
-             - **Needs PR Upstream**: Manual process - submit to upstream
-             - **Temporary**: Review for potential removal
+          ## Overview
+          This issue tracks cherry pick management during fork upgrade to RELEASE_VERSION_PLACEHOLDER.
 
-             ## Action Items
+          | Metric | Value |
+          |--------|-------|
+          | Total Cherry Picks | [count from CSV] |
+          | Permanent | [count] |
+          | Upstream PR Merged | [count] - Skip |
+          | Upstream PR Not Merged | [count] - Re-apply |
+          | Needs PR Upstream | [count] - Manual |
+          | Temporary | [count] - Review |
+          | Analysis Date | [current date] |
 
-             ### Permanent Cherry Picks
-             [For each permanent:]
-             - [ ] **[commit_hash](commit-link)**: [description]
-               - Status: Permanent
-               - Upstream PR: [pr_link if available]
-               - Note: [note if available]
-               - Action: Find and apply if needed
+          ## Status Handling Rules
+          - **Permanent**: Find and apply if needed
+          - **PR Upstream Merged**: Skip - already in next version
+          - **Upstream PR Not Merged**: Re-apply after checking PR status
+          - **Needs PR Upstream**: Manual process - submit to upstream
+          - **Temporary**: Review for potential removal
 
-             ### Upstream PR Not Merged
-             [For each upstream PR not merged:]
-             - [ ] **[commit_hash](commit-link)**: [description]
-               - Status: Upstream PR not merged
-               - Upstream PR: [pr_link]
-               - Note: [note if available]
-               - Action: Check PR status, re-apply if not merged
+          ## Action Items
 
-             ### Needs PR Upstream
-             [For each needs PR upstream:]
-             - [ ] **[commit_hash](commit-link)**: [description]
-               - Status: Needs PR upstream
-               - Upstream PR: [pr_link if available]
-               - Note: [note if available]
-               - Action: Submit PR to upstream
+          ### Permanent Cherry Picks
+          [List each permanent cherry pick with checkbox, commit link, PR link, and note]
 
-             ### Temporary Cherry Picks
-             [For each temporary:]
-             - [ ] **[commit_hash](commit-link)**: [description]
-               - Status: Temporary
-               - Upstream PR: [pr_link if available]
-               - Note: [note if available]
-               - Action: Review if still needed
+          ### Upstream PR Not Merged
+          [List each with checkbox, commit link, PR link, and note]
 
-             ### PR Upstream Merged (Skip)
-             [For each PR upstream merged:]
-             - [x] ~~**[commit_hash](commit-link)**: [description]~~ Already in next version
-               - Status: PR Upstream Merged
-               - Upstream PR: [pr_link]
-               - Action: Skip
+          ### Needs PR Upstream
+          [List each with checkbox, commit link, PR link, and note]
 
-             ## Notes
-             [Include special notes from CSV]
-             ```
+          ### Temporary Cherry Picks
+          [List each with checkbox, commit link, PR link, and note]
 
-          4. Create working links to commits and PRs. Extract commit hashes from URLs when needed.
+          ### PR Upstream Merged (Skip)
+          [List each as completed/crossed out]
 
-          5. Use TodoWrite to track progress.
+          ## Notes
+          [Include any special notes from CSV data]
+          ```
 
-          6. Use GitHub CLI to create the issue with labels: "cherry-pick", "fork-upgrade", "tracking"
-
-          Begin analysis now.
+          Create the issue now.
           CHERRYEOF
 
-          # Replace placeholders with actual values
-          sed -i.bak "s|CSV_DATA_PLACEHOLDER|${{ inputs.csv_data }}|g" cherry-pick-prompt.txt
-          sed -i.bak "s|RELEASE_VERSION_PLACEHOLDER|${{ inputs.release_version }}|g" cherry-pick-prompt.txt
-          sed -i.bak "s|ISSUE_TITLE_PLACEHOLDER|${{ inputs.issue_title }}|g" cherry-pick-prompt.txt
-          rm -f cherry-pick-prompt.txt.bak
+          # Replace placeholders with actual values using printf to handle special characters
+          CSV_DATA=$(printf '%s\n' "${{ inputs.csv_data }}")
+          RELEASE_VERSION="${{ inputs.release_version }}"
+          ISSUE_TITLE="${{ inputs.issue_title }}"
+
+          # Use a more robust method to replace placeholders
+          cat > temp-replacements.txt << 'TEMPEOF'
+          ${{ inputs.csv_data }}
+          TEMPEOF
+
+          # Replace CSV_DATA_PLACEHOLDER with file contents
+          awk '
+          BEGIN { RS="CSV_DATA_PLACEHOLDER"; ORS="" }
+          NR==1 { print }
+          NR==2 { 
+            while ((getline line < "temp-replacements.txt") > 0) {
+              print line "\n"
+            }
+            close("temp-replacements.txt")
+            print
+          }
+          NR>2 { print RS $0 }
+          ' cherry-pick-prompt.txt > cherry-pick-prompt-new.txt
+          mv cherry-pick-prompt-new.txt cherry-pick-prompt.txt
+
+          # Replace other placeholders safely
+          sed -i.bak "s|RELEASE_VERSION_PLACEHOLDER|${RELEASE_VERSION}|g" cherry-pick-prompt.txt
+          sed -i.bak "s|ISSUE_TITLE_PLACEHOLDER|${ISSUE_TITLE}|g" cherry-pick-prompt.txt
+          rm -f cherry-pick-prompt.txt.bak temp-replacements.txt
 
           # Run the analyzer with timeout and error handling
           PROMPT_CONTENT=$(cat cherry-pick-prompt.txt)
