@@ -84,10 +84,12 @@ jobs:
           8. Format all links using markdown syntax: [text](url)
           </instructions>
 
-          Use technical, concise language. Follow this structure:
-          <formatting_example>
-          # ISSUE_TITLE_PLACEHOLDER - RELEASE_VERSION_PLACEHOLDER
+          Use technical, concise language. Create the issue with this EXACT structure:
 
+          <example_issue>
+          <issue_title>ISSUE_TITLE_PLACEHOLDER - RELEASE_VERSION_PLACEHOLDER</issue_title>
+
+          <issue_body>
           ## Summary
 
           Fork upgrade to `RELEASE_VERSION_PLACEHOLDER` - cherry pick tracking.
@@ -96,15 +98,15 @@ jobs:
           **Upstream Branch**: `upstream/UPSTREAM_BRANCH_PLACEHOLDER`
 
           | Status | Count |
-          |--------|------:|
-          | Permanent | [count] |
-          | PR Upstream Merged | [count] |
-          | Upstream PR Not Merged | [count] |
-          | Needs PR Upstream | [count] |
-          | Temporary | [count] |
-          | **Total** | **[total]** |
+          |--------|--------|
+          | Permanent | [calculate from CSV] |
+          | PR Upstream Merged | [calculate from CSV] |
+          | Upstream PR Not Merged | [calculate from CSV] |
+          | Needs PR Upstream | [calculate from CSV] |
+          | Temporary | [calculate from CSV] |
+          | **Total** | **[sum of all above]** |
 
-          Generated: [ISO-8601 timestamp]
+          Generated: [current ISO-8601 timestamp]
 
           ## Status Definitions
 
@@ -118,35 +120,43 @@ jobs:
 
           ### Permanent
           Apply during fork upgrade.
-          - [ ] **[cherry-pick-description]**
-            - Commit: [`[commit-hash-short]`]([full-commit-url])
-            - Note: [note-if-exists]
+          [For each Permanent cherry pick in CSV:]
+          - [ ] **[cherry-pick-description from CSV]**
+            - Commit: [`[first 7 chars of commit hash]`]([full commit URL from CSV])
+            - Note: [note from CSV if exists]
 
           ### Upstream PR Not Merged
           Check PR status before applying.
-          - [ ] **[cherry-pick-description]**
-            - Commit: [`[commit-hash-short]`]([full-commit-url])
-            - PR: [#[pr-number]]([upstream-pr-url])
-            - Note: [note-if-exists]
+          [For each "Upstream PR not merged" cherry pick in CSV:]
+          - [ ] **[cherry-pick-description from CSV]**
+            - Commit: [`[first 7 chars of commit hash]`]([full commit URL from CSV])
+            - PR: [#[extract PR number]]([upstream PR URL from CSV])
+            - Note: [note from CSV if exists]
 
           ### Needs PR Upstream
           Submit to upstream before next upgrade.
-          - [ ] **[cherry-pick-description]**
-            - Commit: [`[commit-hash-short]`]([full-commit-url])
-            - Note: [note-if-exists]
+          [For each "Needs PR upstream" cherry pick in CSV:]
+          - [ ] **[cherry-pick-description from CSV]**
+            - Commit: [`[first 7 chars of commit hash]`]([full commit URL from CSV])
+            - Note: [note from CSV if exists]
 
           ### Temporary
           Review for removal.
-          - [ ] **[cherry-pick-description]**
-            - Commit: [`[commit-hash-short]`]([full-commit-url])
-            - Note: [note-if-exists]
+          [For each Temporary cherry pick in CSV:]
+          - [ ] **[cherry-pick-description from CSV]**
+            - Commit: [`[first 7 chars of commit hash]`]([full commit URL from CSV])
+            - Note: [note from CSV if exists]
 
           ### PR Upstream Merged
           Skip - included in release.
-          - ~~**[cherry-pick-description]**~~
-            - Commit: [`[commit-hash-short]`]([full-commit-url])
-            - PR: [#[pr-number]]([upstream-pr-url]) ✓
-          </formatting_example>
+          [For each "PR Upstream Merged" cherry pick in CSV:]
+          - ~~**[cherry-pick-description from CSV]**~~
+            - Commit: [`[first 7 chars of commit hash]`]([full commit URL from CSV])
+            - PR: [#[extract PR number]]([upstream PR URL from CSV]) ✓
+          </issue_body>
+          </example_issue>
+
+          IMPORTANT: Include the Working Branch and Upstream Branch information exactly as shown above.
 
           Create the GitHub issue now with repository: ${{ github.repository }}
           CHERRYEOF
