@@ -1,0 +1,575 @@
+name: Fork Upgrade Analyzer
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_url:
+        description: 'Upstream release URL (e.g., https://github.com/paritytech/polkadot-sdk/releases/tag/polkadot-stable2503-2)'
+        required: true
+        type: string
+      branch_name:
+        description: 'Branch name (e.g., fork-upgrade/v1.2.3)'
+        required: true
+        type: string
+      target_branch:
+        description: 'Target branch for the PR'
+        required: false
+        default: 'main'
+        type: string
+      pr_draft:
+        description: 'Create PR as draft'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  analyze-and-create-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          
+      - name: Extract release information
+        id: release_info
+        run: |
+          # Extract version and repo info from URL
+          if [[ ! "${{ inputs.release_url }}" =~ ^https://github.com/[^/]+/[^/]+/releases/tag/.+ ]]; then
+            echo "Error: Invalid release URL format"
+            exit 1
+          fi
+          
+          VERSION=$(echo "${{ inputs.release_url }}" | sed -n 's/.*\/tag\/\(.*\)$/\1/p')
+          REPO_PATH=$(echo "${{ inputs.release_url }}" | sed -n 's|https://github.com/\([^/]*/[^/]*\)/.*|\1|p')
+          REPO_NAME=$(echo "${REPO_PATH}" | tr '/' '-')
+          ANALYSIS_DIR="${REPO_NAME}-${VERSION}-fork-analysis"
+          BRANCH_NAME="${{ inputs.branch_name }}"
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "repo_path=${REPO_PATH}" >> $GITHUB_OUTPUT
+          echo "analysis_dir=${ANALYSIS_DIR}" >> $GITHUB_OUTPUT
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          
+          # Log for debugging
+          echo "📋 Release Information:"
+          echo "  Version: ${VERSION}"
+          echo "  Repository: ${REPO_PATH}"
+          echo "  Analysis Directory: ${ANALYSIS_DIR}"
+          echo "  Branch Name: ${BRANCH_NAME}"
+          
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+      - name: Create branch and initial PR
+        id: create_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if branch already exists
+          if git ls-remote --heads origin "${{ steps.release_info.outputs.branch_name }}" | grep -q "${{ steps.release_info.outputs.branch_name }}"; then
+            echo "⚠️ Branch already exists, checking out existing branch"
+            git fetch origin "${{ steps.release_info.outputs.branch_name }}"
+            git checkout "${{ steps.release_info.outputs.branch_name }}"
+            BRANCH_EXISTS="true"
+          else
+            echo "📝 Creating new branch"
+            git checkout -b "${{ steps.release_info.outputs.branch_name }}"
+            BRANCH_EXISTS="false"
+            
+            # Create initial placeholder file
+            mkdir -p "${{ steps.release_info.outputs.analysis_dir }}"
+            echo "# Fork Upgrade Analysis in Progress..." > "${{ steps.release_info.outputs.analysis_dir }}/README.md"
+            echo "" >> "${{ steps.release_info.outputs.analysis_dir }}/README.md"
+            echo "Analysis for: ${{ inputs.release_url }}" >> "${{ steps.release_info.outputs.analysis_dir }}/README.md"
+            echo "Started at: $(date)" >> "${{ steps.release_info.outputs.analysis_dir }}/README.md"
+            
+            git add "${{ steps.release_info.outputs.analysis_dir }}"
+            git commit -m "Initial commit for fork upgrade analysis
+            
+            Branch: ${{ steps.release_info.outputs.branch_name }}
+            Release: ${{ inputs.release_url }}"
+            
+            git push -u origin "${{ steps.release_info.outputs.branch_name }}"
+          fi
+          
+          echo "branch_exists=${BRANCH_EXISTS}" >> $GITHUB_OUTPUT
+          
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --base "${{ inputs.target_branch }}" --head "${{ steps.release_info.outputs.branch_name }}" --json number --jq '.[0].number' || echo "")
+          
+          if [ -n "$EXISTING_PR" ]; then
+            echo "📝 PR already exists: #${EXISTING_PR}"
+            echo "pr_number=${EXISTING_PR}" >> $GITHUB_OUTPUT
+            echo "PR_URL=https://github.com/${{ github.repository }}/pull/${EXISTING_PR}" >> $GITHUB_ENV
+          else
+            echo "🆕 Creating new PR"
+            PR_TITLE="${{ steps.release_info.outputs.branch_name }}"
+            
+            DRAFT_FLAG=""
+            if [ "${{ inputs.pr_draft }}" = "true" ]; then
+              DRAFT_FLAG="--draft"
+            fi
+            
+            PR_BODY="# Fork Upgrade Analysis
+
+🔄 **Status**: Analysis in progress...
+
+**Release URL**: ${{ inputs.release_url }}
+**Branch**: ${{ steps.release_info.outputs.branch_name }}
+**Started**: $(date)
+
+---
+
+*This PR will be updated automatically once the analysis is complete.*"
+            
+            PR_URL=$(gh pr create \
+              --title "${PR_TITLE}" \
+              --body "${PR_BODY}" \
+              --base "${{ inputs.target_branch }}" \
+              --head "${{ steps.release_info.outputs.branch_name }}" \
+              --label "fork-upgrade" \
+              --label "automated" \
+              --label "analysis-in-progress" \
+              ${DRAFT_FLAG})
+              
+            PR_NUMBER=$(echo "${PR_URL}" | sed 's/.*\/\([0-9]*\)$/\1/')
+            echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+            echo "PR_URL=${PR_URL}" >> $GITHUB_ENV
+          fi
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude --version
+          
+      - name: Run Fork Upgrade Analyzer
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Starting fork upgrade analysis..."
+          echo "📍 Working on PR #${{ steps.create_pr.outputs.pr_number }}"
+          
+          # Update PR to show analysis is running
+          gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "🤖 Fork upgrade analysis started at $(date)"
+          
+          # Create the full prompt with analyzer instructions
+          cat > analyzer-prompt.txt << 'EOF'
+# Fork Upgrade Analyzer - Upstream Change Analysis for Forks
+
+**PURPOSE**: Analyzes upstream release changes in $ARGUMENTS and generates a comprehensive upgrade guide for fork maintainers by examining all changes in the upstream repository.
+
+## Working Directory Setup
+
+1. **Create Main Analysis Directory**: `<repo>-<version>-fork-analysis` (e.g., `react-v18.3.0-fork-analysis`)
+2. **Create PR/Issue Subdirectories**: Individual directories for each PR/issue will be created during analysis
+
+## Analysis Process
+
+### Phase 1: Upstream Repository Analysis
+
+**FIRST**, analyze the upstream repository:
+
+1. **Gather Upstream Release Information**:
+   - Parse the release URL/tag provided in $ARGUMENTS
+   - Identify the upstream repository and version
+   - Fetch the complete release notes and changelog
+   - Extract all PRs, commits, and issues included in the release
+
+2. **Use TodoWrite** to track:
+   - Each PR/issue discovered in the release
+   - Analysis completion status for each item
+   - Final report generation
+
+### Phase 2: Parallel Change Unit Analysis
+
+1. **Identify Change Units**:
+   - Parse the release notes to find all PR numbers and issue numbers
+   - Group related items into logical change units:
+     - When an issue is mentioned alongside one or more PRs that address it, group them together as a single change unit
+     - When multiple PRs work together to solve the same issue, group them all with that issue
+     - When a standalone PR is mentioned without an associated issue, treat it as its own change unit
+     - When a standalone issue is mentioned without associated PRs, treat it as its own change unit
+   - Ensure each PR appears in exactly one change unit to avoid duplication
+   - Each change unit should represent one logical change or improvement to the codebase
+
+2. **Generate Change Unit Analysis Agents**:
+   Spawn a dedicated sub-agent for EACH change unit identified.
+   **CRITICAL**: You MUST spawn all sub-agents in parallel in a single message for maximum efficiency.
+
+3. **Sub-Agent Instructions**:
+   Each sub-agent receives a focused task to analyze ONE logical change unit, which may contain multiple related PRs and issues.
+   
+   Create directory structure:
+   ```
+   <main-dir>/
+   ├── change-unit-<identifier>/
+   │   └── analysis.md
+   └── fork-upgrade-guide.md
+   ```
+   
+   Where `<identifier>` is:
+   - `pr-<number>` for standalone PRs
+   - `issue-<number>` for standalone issues  
+   - `issue-<number>-prs` for an issue with related PRs
+   - `pr-<number>-group` for multiple related PRs without a main issue
+
+4. **Sub-Agent Context Template**:
+   For each change unit, create a specific analysis task:
+   
+   ```
+   Analyze the following change unit from [repository] for the [version] release:
+   
+   **Primary Item**: [PR/Issue #number: Title]
+   **URL**: [full URL]
+   
+   **Related Items** (if any):
+   - [PR/Issue #number: Title - URL]
+   - [PR/Issue #number: Title - URL]
+   
+   Your task:
+   1. Fetch content for all items in this change unit using the provided URLs
+   2. Analyze how these items work together to implement a single logical change
+   3. Create a unified analysis report in your working directory
+   4. Use proper markdown formatting with:
+      - Clear headings and subheadings
+      - Hyperlinks to relevant files/lines (format: [filename:line](url))
+      - Code blocks with syntax highlighting
+      - Bullet points for lists
+      - Tables where appropriate
+   
+   The analysis report should include:
+   
+   # Change Unit: [Primary Item Title]
+   
+   ## Overview
+   - **Type**: [Bug Fix | Feature | Enhancement | Breaking Change | Performance | Security]
+   - **Component**: [Affected component/module]
+   - **Severity**: [Critical | High | Medium | Low]
+   - **Primary Item**: [PR/Issue #number with hyperlink]
+   - **Related Items**: [List of related PR/Issue numbers with hyperlinks, or "None"]
+   
+   ## Summary
+   [2-3 sentence executive summary of the complete change unit and how the items work together]
+   
+   ## Items in This Change Unit
+   
+   ### [Primary Item #number]: [Title]
+   **URL**: [hyperlink]
+   **Role**: [Primary implementation | Issue description | etc.]
+   
+   ### [Related Item #number]: [Title] (if any)
+   **URL**: [hyperlink]  
+   **Role**: [Supporting fix | Additional implementation | etc.]
+   
+   ## Technical Details
+   
+   ### Changes Made
+   - [List key files modified across all items with hyperlinks]
+   - [Describe overall implementation approach]
+   - [Explain how multiple items coordinate if applicable]
+   
+   ### Code Examples
+   ```language
+   // Before
+   [relevant code snippet]
+   
+   // After  
+   [relevant code snippet]
+   ```
+   
+   ## Impact Analysis
+   
+   ### Breaking Changes
+   [List any breaking changes or "None"]
+   
+   ### Migration Requirements
+   [Detailed migration steps or "No migration required"]
+   
+   ### Dependencies
+   [List any new dependencies or version changes]
+   
+   ## Testing Considerations
+   [Describe what should be tested]
+   
+   ## Risks and Benefits
+   
+   ### Benefits
+   - [List benefits]
+   
+   ### Risks
+   - [List potential risks]
+   
+   ## Recommendations
+   [Specific recommendations for fork maintainers]
+   ```
+
+5. **Parallel Execution**:
+   ```
+   Spawn all sub-agents simultaneously:
+   - Each agent works on exactly ONE change unit (which may contain multiple related PRs/issues)
+   - Agents create their reports independently
+   - No coordination needed between agents
+   - No duplication of work since each PR/issue appears in exactly one change unit
+   ```
+
+### Phase 3: Generate Fork Upgrade Guide for PR Description
+
+1. **Collect All Change Unit Reports**:
+   - Read all `analysis.md` files from change unit subdirectories
+   - Sort by primary item number for consistent ordering
+
+2. **Create PR-Ready Upgrade Guide**:
+   Create `fork-upgrade-guide.md` optimized for use as a PR description:
+
+   ```markdown
+   # 🚀 Fork Upgrade to [Repository] [Version]
+   
+   ## 📋 Overview
+   
+   This PR tracks the upgrade of our fork to **[repository name] [version]**. Each change unit from the upstream release has been analyzed and documented below.
+   
+   | Metric | Value |
+   |--------|-------|
+   | **Upstream Repository** | [repository name with link] |
+   | **Target Version** | [version] |
+   | **Analysis Date** | [date] |
+   | **Total Change Units** | [number] |
+   | **Breaking Changes** | [count] |
+   | **Security Fixes** | [count] |
+   
+   ## 🎯 Release Summary
+   
+   [2-3 sentence high-level summary of what this release includes]
+   
+   ## ⚠️ Critical Items
+   
+   ### 🔴 Breaking Changes
+   [List each breaking change with checkbox and link to analysis]
+   - [ ] **[Component]**: [Brief description] → [📄 Details](./change-unit-xxx/analysis.md)
+   
+   ### 🛡️ Security Fixes
+   [List each security fix with checkbox and link to analysis]
+   - [ ] **[Severity]**: [Brief description] → [📄 Details](./change-unit-xxx/analysis.md)
+   
+   ## ✅ Implementation Checklist
+   
+   Track progress by checking off each change unit as it's addressed:
+   
+   ### 🐛 Bug Fixes
+   [For each bug fix change unit:]
+   - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+     - Related: [#num](link), [#num](link)
+     - Component: `[component name]`
+     - Impact: [Low/Medium/High]
+   
+   ### ✨ New Features  
+   [For each feature change unit:]
+   - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+     - Related: [#num](link), [#num](link)
+     - Component: `[component name]`
+     - Impact: [Low/Medium/High]
+   
+   ### 🚀 Performance Improvements
+   [For each performance change unit:]
+   - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+     - Related: [#num](link), [#num](link)
+     - Component: `[component name]`
+     - Impact: [Low/Medium/High]
+   
+   ### 🔧 Enhancements
+   [For each enhancement change unit:]
+   - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+     - Related: [#num](link), [#num](link)
+     - Component: `[component name]`
+     - Impact: [Low/Medium/High]
+   
+   ### 📚 Documentation & Other
+   [For each other change unit:]
+   - [ ] **[#primary-item](upstream-link)**: [Title] → [📄 Analysis](./change-unit-xxx/analysis.md)
+     - Related: [#num](link), [#num](link)
+     - Component: `[component name]`
+     - Impact: [Low/Medium/High]
+   
+   ## 📊 Implementation Progress
+   
+   - [ ] All breaking changes addressed
+   - [ ] All security fixes applied
+   - [ ] All bug fixes reviewed and applied
+   - [ ] All new features integrated
+   - [ ] All performance improvements evaluated
+   - [ ] Fork-specific customizations preserved
+   - [ ] Test suite passing
+   - [ ] Documentation updated
+   
+   ## 🔗 Quick Links
+   
+   - **Upstream Release**: [link]
+   - **Full Changelog**: [link]
+   - **Our Fork**: [link]
+   
+   ## 📝 Notes for Reviewers
+   
+   Each change unit has been analyzed in detail. Click the 📄 Analysis links above to see:
+   - Technical implementation details
+   - Migration requirements
+   - Potential risks and benefits
+   - Fork-specific recommendations
+   
+   ---
+   
+   **How to use this PR:**
+   1. Review each change unit analysis by clicking the provided links
+   2. Check off items as they are implemented
+   3. Add comments to track any fork-specific modifications needed
+   4. Use this PR as the central tracking point for the upgrade
+   ```
+
+## Key Improvements
+
+1. **Full Parallelization**: Every change unit gets its own agent running simultaneously
+2. **Smart Deduplication**: Related PRs and issues are grouped into logical change units to avoid duplicate analysis
+3. **Better Formatting**:
+   - Use of emojis for visual clarity
+   - Tables for organized data presentation
+   - Hyperlinks throughout the document
+   - Clear section separators
+   - Consistent heading hierarchy
+4. **Enhanced Navigation**:
+   - Direct links to detailed analyses
+   - Cross-references between sections
+   - File and line number links in format `[file:line](url)`
+5. **Structured Analysis**:
+   - Each change unit has consistent analysis format
+   - Clear categorization and prioritization
+   - Migration checklist for easy tracking
+
+## Implementation Notes
+
+- **Change Unit Approach**: Related PRs and issues are grouped together and analyzed as logical units
+- **Maximum Parallelization**: All agents spawn in one operation
+- **Clean Separation**: Each agent works in isolation with no shared state
+- **No Duplication**: Each PR/issue appears in exactly one change unit
+- **Consistent Output**: All analyses follow the same template
+- **Rich Formatting**: Markdown features used extensively for readability
+
+Please begin the analysis now.
+EOF
+          
+          # Run the analyzer with timeout and error handling
+          timeout 30m claude --allowed-tools "Edit,Glob,Grep,LS,Read,Write,mcp__github_file_ops__commit_files,WebSearch,WebFetch" < analyzer-prompt.txt || {
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 124 ]; then
+              echo "❌ Analysis timed out after 30 minutes"
+              gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "❌ Analysis timed out after 30 minutes"
+              exit 1
+            else
+              echo "❌ Analysis failed with exit code: $EXIT_CODE"
+              gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "❌ Analysis failed with exit code: $EXIT_CODE"
+              exit $EXIT_CODE
+            fi
+          }
+          
+          # Verify the analysis was created
+          if [ ! -d "${{ steps.release_info.outputs.analysis_dir }}" ]; then
+            echo "❌ Analysis directory was not created"
+            gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "❌ Analysis directory was not created"
+            exit 1
+          fi
+          
+          if [ ! -f "${{ steps.release_info.outputs.analysis_dir }}/fork-upgrade-guide.md" ]; then
+            echo "❌ Fork upgrade guide was not generated"
+            gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "❌ Fork upgrade guide was not generated"
+            exit 1
+          fi
+          
+          echo "✅ Analysis completed successfully"
+          gh pr comment ${{ steps.create_pr.outputs.pr_number }} --body "✅ Analysis completed successfully at $(date)"
+          
+      - name: Update PR with analysis results
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Commit and push the analysis results
+          git add "${{ steps.release_info.outputs.analysis_dir }}"
+          git commit -m "Add fork upgrade analysis for ${{ steps.release_info.outputs.version }}
+          
+          Automated analysis of upstream release:
+          ${{ inputs.release_url }}
+          
+          Generated by Fork Upgrade Analyzer workflow"
+          
+          git push
+          
+          # Update PR with analysis results
+          PR_TITLE="🚀 Fork Upgrade to ${{ steps.release_info.outputs.version }}"
+          PR_BODY_FILE="${{ steps.release_info.outputs.analysis_dir }}/fork-upgrade-guide.md"
+          
+          echo "📝 Updating PR #${{ steps.create_pr.outputs.pr_number }} with analysis results"
+          gh pr edit ${{ steps.create_pr.outputs.pr_number }} \
+            --title "${PR_TITLE}" \
+            --body-file "${PR_BODY_FILE}"
+          
+          # Remove the in-progress label and add version label
+          gh pr edit ${{ steps.create_pr.outputs.pr_number }} \
+            --remove-label "analysis-in-progress" \
+            --add-label "${{ steps.release_info.outputs.version }}"
+          
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "# Fork Upgrade Analysis Summary 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status**: Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Details" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release URL** | ${{ inputs.release_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ steps.release_info.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Repository** | ${{ steps.release_info.outputs.repo_path }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Branch** | ${{ inputs.target_branch }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Analysis Directory** | \`${{ steps.release_info.outputs.analysis_dir }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch Name** | \`${{ steps.release_info.outputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pull Request** | [PR #${{ steps.create_pr.outputs.pr_number }}](${PR_URL}) |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add analysis files if they exist
+          if [ -d "${{ steps.release_info.outputs.analysis_dir }}" ]; then
+            echo "## Generated Files" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            find "${{ steps.release_info.outputs.analysis_dir }}" -type f -name "*.md" | sort
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+      - name: Post failure comment
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Only post if this was triggered from an issue
+          if [ -n "${{ github.event.issue.number }}" ]; then
+            gh issue comment ${{ github.event.issue.number }} --body "❌ Fork upgrade analysis failed. Please check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          fi
